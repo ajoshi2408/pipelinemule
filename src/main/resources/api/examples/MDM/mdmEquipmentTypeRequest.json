@@ -1,0 +1,23 @@
+[
+ {
+    "GenSetType": "US",
+    "ISOcode": "CMGS",
+    "IsReefer": "N",
+    "HandleAs": null,
+    "Description": "Genset Underslung Mount",
+    "MaxWeightKG": 0.0,
+    "Type": "GS",
+    "HeightFT": 0.0000,
+    "HeavyWeightKG": 0.0,
+    "SizeType": "GSUM",
+    "TareWeightKG": 907.1850,
+    "SizeFT": 20,
+    "IsGenSet": "Y",
+    "Hide": "N",
+    "EQGroup": "ACC",
+    "IsChassis": "N",
+    "IsContainer": "N",
+    "WidthFT": 0.0000,
+    "LASTUPDATE_TIMESTAMP": "2022-02-09T17:24:35.729343"
+  }
+  ]

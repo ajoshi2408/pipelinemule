@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <flow name="booking-delete">
+        <set-payload value="#[[vars.bookingId]]" doc:name="Set Payload with Booking ID fetched earlier" />
+
+        <flow-ref doc:name="Refer to cf-common-salesforce-delete" doc:id="28fe583d-4059-4ad7-920e-284dd8e985f8" name="cf-common-salesforce-delete"/>
+		<logger message="SF response after DELETE booking :: #[payload]" level="DEBUG" doc:name="SF response after DELETE " category="com.crowley.booking-process"/>
+		<validation:is-true config-ref="Validation_Configuration" expression="#[payload.successful]" doc:name="validate-successful-operation" message="Unable to delete Booking object"/>
+
+        <error-handler>
+            <on-error-continue doc:name="Catch Exception Strategy">
+                				<ee:transform doc:name="set ERROR" doc:id="922f96f3-f0f3-443f-a848-ade56edd389b" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to delete Booking object with Booking ID/Booking Reference Number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if (not isEmpty (payload.items[0].message)) payload.items[0].message else error.description default "Unable to delete Booking object",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+            	<logger level="ERROR" doc:name="log ERROR" doc:id="e79b4b82-bf59-4b2c-8b60-d4c784cf9e25" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="7e2be67c-d9b5-4600-9a48-d2bdf2704b32" name="common-error-notification" />
+            </on-error-continue>
+        </error-handler>
+
+    </flow>
+
+</mule>

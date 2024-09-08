@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="mf-kafka-baplie-final-event" doc:id="50caa7c8-c9e3-44fe-b4e3-41603aa9290d" >
+		<kafka:message-listener doc:name="Message listener" doc:id="71ce11f4-6d9a-4835-89f8-aefee2aa4b0b" config-ref="Baplie_final_Apache_Kafka_Consumer_configuration"/>
+		<ee:transform doc:name="DW Set Read Payload as JSON" doc:id="f75c1bca-d539-4592-9656-f710f3a18779" >
+			<ee:message >
+				<ee:set-payload resource="dwl/baplie/baplie-final/p-baplie-final-readpayload-as-JSON.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log INFO Kafka Flow Start" doc:id="34da04c3-8722-49db-9d34-d0f55bc125a2" message="baplie final payload received at kafka with BAPKey #[payload.BAPKey]"/>
+		<vm:publish doc:name="Publish to baplie-final-queue" doc:id="931860d3-93c7-42a3-b677-b0c453d1aa10" config-ref="common_vm-config" sendCorrelationId="AUTO" queueName="${baplie.final.queue}" timeout="${baplie.final.vm.timeout}"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="8c8f77ed-397d-47d8-aa83-40ebfd916773" >
+				<ee:transform doc:name="DW Set Support Ticket Payload" doc:id="49c014ab-e7a1-4b44-9ccb-a0d29ee562ce" >
+					<ee:message >
+						<ee:set-payload resource="dwl/baplie/baplie-final/p-baplie-final-supportTicketPayload.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Log INFO Error Message" doc:id="70f202d3-2193-445b-ad89-9ef146c5896a" message='"Error:" payload.errorMessage'/>
+				<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="896e7a4c-eac3-4116-a788-dc4a6e94f12f" name="cf-invoke-support-ticket-service"/>
+				<ee:transform doc:name="DW Set Error Notification Payload" doc:id="d267db58-a914-42d2-8a15-0a772ce6fa94" >
+					<ee:message >
+						<ee:set-payload resource="dwl/baplie/baplie-final/p-baplie-final-error-notification-request.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="446a0da1-f052-4b7d-8db7-16949eb9c419" name="cf-invoke-notification-service"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="sf-query-baplie-final" doc:id="57d750c9-7e0c-4f90-bff5-20ebdd60b49f" >
+		<logger level="INFO" doc:name="LOG INFO- SF Query Flow Start" doc:id="a0406217-8044-4f06-8794-c4d4a4d5c443" message="Start of the composite request to query BAPKey for baplie edifact final copy with BAPKey: #[vars.BAPKey]"/>
+		<salesforce:query doc:name="SF Query for vesselId" doc:id="07ece595-67ac-461f-ad5a-e265206bed14" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id
+FROM VesselEvents__c
+WHERE Bapkey__c = ':Bapkey__c']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"Bapkey__c" : vars.BAPKey
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<set-variable value="#[payload[0].Id]" doc:name="FV Set for vesselId" doc:id="1e4b9eb6-86b3-46de-9e53-be0f94bb5d6e" variableName=" vesselId"/>
+		<validation:is-not-null doc:name="Is vesselId not null" doc:id="32381203-9a4d-4e59-90aa-89401a3bd9eb" value="#[vars.vesselId]" message='#["No VesselEventId present in Salesforce for BAPKey: " ++ vars.BAPKey]' config-ref="Validation_Configuration" />
+		<logger level="INFO" doc:name="LOG INFO- SF Query Result" doc:id="23267cac-afb7-49a9-b0d5-cd348c33ff53" message="Salesforce query response after querying with BAPKey-#[vars.BAPKey] is --- #[payload]"/>
+	</sub-flow>
+	<sub-flow name="sf-baplie-cusres-common-composite-response-handler" doc:id="dc60ac06-ce33-40d3-96a0-b7f2b1ede010" >
+		<logger level="INFO" doc:name="Log INFO- Composite Response handler Start" doc:id="d0dc72af-edb6-4eb0-a7e0-9ff8e34d30b8" message="Composite Response handler flow started"/>
+		<choice doc:name="Check Composite Response" doc:id="d44407c5-62a2-47f6-8c29-0da555ef63bf" >
+			<when expression="#[payload.compositeResponse[0].httpStatusCode &gt;= 200 and payload.compositeResponse[0].httpStatusCode &lt;= 299]">
+				<logger level="INFO" doc:name="Log INFO- SF Composite Success Response" doc:id="36efc407-d60a-4bf1-9e39-07394f1673e5" message="SF Composite Success Response: #[payload]"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Log INFO- SF Composite Error Response" doc:id="45c3e3b4-6f9c-4369-bc86-64cccf2e9e0e" message="SF Composite Error Response: #[payload]"/>
+				<ee:transform doc:name="DW Set ErrorDetails" doc:id="a8acb9e8-d761-4252-bdcb-f0b3fd8cfc77" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="errorDetails" resource="dwl/baplie/baplie-final/v-baplie-final-errorDetails.dwl" />
+					</ee:variables>
+				</ee:transform>
+				<validation:is-blank-string doc:name="Is blank errorCode" doc:id="2d7bd449-2fb4-4067-bb5c-f6aab139d1ef" value="#[vars.errorDetails.errorCode]" message='#[vars.errorDetails.message]'/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Log INFO Flow End" doc:id="209a79b6-907d-4c90-8c6d-4e4b272fa7a7" message="Composite Response handler flow completed "/>
+	</sub-flow>
+	<sub-flow name="sf-composite-baplie-final" doc:id="aa114a4c-7969-4cd2-9e37-fbfd82dc37c3" >
+		<logger level="INFO" doc:name="LOG INFO- SF Composite Flow Start" doc:id="b442c9f7-4066-4f50-88cd-af962627c89c" message="Start of the salesforce composite flow for baplie edifact final copy with BAPKey: #[vars.BAPKey]"/>
+		<ee:transform doc:name="DW Set Composite Request" doc:id="60f8abe3-3663-4aea-83b1-639bd4243a0d">
+			<ee:message>
+				<ee:set-payload resource="dwl/baplie/baplie-final/p-baplie-final-composite-request.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite" doc:id="5ca3cd8a-3f98-4c31-95f4-ad113b0336c9" name="cf-common-salesforce-composite" />
+		<logger level="DEBUG" doc:name="LOG DEBUG - SF Composite Result" doc:id="ddbc4174-5ab2-4d55-90d1-4f9e5cab2f23" message="Salesforce composite response for baplie final with BAPKey-#[vars.BAPKey] is --- #[payload]" category="com.crowley.sfinboundss.bapliefinal"/>
+	</sub-flow>
+	<flow name="mf-vm-baplie-final-event" doc:id="7bc4632a-4b9c-4837-baca-2a4364d2b463" >
+		<vm:listener doc:name="Listen from baplie-final-queue" doc:id="712c150f-3e57-419b-b04e-b17a7ad52a02" config-ref="common_vm-config" queueName="${baplie.final.queue}" numberOfConsumers="${baplie.final.vm.consumers}" timeout="${baplie.final.vm.timeout}"/>
+		<logger level="INFO" doc:name="LOG INFO BAPKey" doc:id="7d7788f9-87d4-445e-aa13-3ad3fe437849" message="baplie final payload consumed at VM with BAPKey #[payload.BAPKey]"/>
+		<ee:transform doc:name="DW Set BAPKey" doc:id="3485ca07-b05c-479b-b3f5-1dc940c1d234" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="BAPKey" resource="dwl/baplie/baplie-final/v-baplie-final-BAPKey.dwl" />
+				<ee:set-variable variableName="originalPayload" resource="dwl/baplie/baplie-final/v-baplie-final-originalPayload.dwl" />
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-query-baplie-final" doc:id="1652ad8b-3143-4848-91f6-9585918fa56d" name="sf-query-baplie-final"/>
+		<flow-ref doc:name="Refer to sf-composite-baplie-final" doc:id="038fc041-84ca-4931-9173-7e8a7a2d81fd" name="sf-composite-baplie-final"/>
+		<flow-ref doc:name="Refer to sf-baplie-cusres-common-composite-response-handler" doc:id="c846c41c-df11-4473-b3cd-1e93f147380b" name="sf-baplie-cusres-common-composite-response-handler" />
+		<logger level="INFO" doc:name="Log INFO Flow End" doc:id="79ad178a-79d1-47ac-97d6-765f4cea562e" message="BAPLIE Final flow completed successfully for BAPKey: #[vars.BAPKey] "/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="7703c74b-3ff3-4274-95c7-63b180902911" >
+				<logger level="ERROR" doc:name="Log ERROR Error Message " doc:id="f35d9c5e-1dbf-4956-80e6-dd5bd9e54349" message="Error occured during processing BAPLIE-Final record due to #[error.detailedDescription], calling Notification Service"/>
+				<ee:transform doc:name="DW SET Error Notification Payload" doc:id="f7f768f3-71ee-444e-af47-3586fa2c8ac0" >
+					<ee:message >
+						<ee:set-payload resource="dwl/baplie/baplie-final/p-baplie-final-notification-request.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="03a09eda-d3ad-4565-8cc6-76cd32947c46" name="cf-invoke-notification-service"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>

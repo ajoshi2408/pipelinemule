@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+	<sub-flow name="sf-get-object-from-s3" doc:id="049479e2-a393-497d-a008-323a197bad95" >
+		<ee:transform doc:name="Set Payload" doc:id="24925ad9-4115-417a-8e5a-a56bab8742b9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Entry" doc:id="849f61d0-41bb-446b-a1d2-ba78790d978a" message="Entry , Get Object from S3 by key #[payload]"/>
+		<s3:get-object doc:name="Get Content By Key" doc:id="69bccc7c-cb5b-4a3e-8771-0926841f84cd" bucketName="#[payload.bucketName]" key="#[payload.key]" config-ref="Amazon_S3_Basic_Configuration"/>
+		<ee:transform doc:name="Set payload" doc:id="11818ae1-bf40-4aef-ad73-96968c12cccf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Exit" doc:id="afcb325e-e97c-4b0b-9193-3bb725fb5a7b" message="Exit , S3 Content Obtained #[payload]"/>
+		<logger level="DEBUG" doc:name="Log Payload" doc:id="23d5f3af-384e-4f07-b425-5796131f7a12" message="#[payload]" category="com.sfinbound.cusres"/>
+	</sub-flow>
+</mule>

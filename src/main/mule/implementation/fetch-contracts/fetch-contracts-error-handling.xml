@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="fetch-contracts-error-handler" doc:id="f4605219-217e-4495-96c1-c990e92b48ae" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue - For All Connectivity Errors" doc:id="2c11684f-6445-4827-a877-db0b264b63ff" type="SALESFORCE:CONNECTIVITY, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:TIMEOUT, VM:RETRY_EXHAUSTED,VM:CONNECTIVITY, VM:QUEUE_TIMEOUT, HTTP:CONNECTIVITY, HTTP:TIMEOUT">
+			<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="c48065af-84b9-4bde-8c38-6f7c396d7adc" message='Fetch Contracts : Error sending Contracts to C-Sight due to #[error.detailedDescription] ' />
+			<ee:transform doc:name="DW SET Case Request" doc:id="c7d7dc18-317c-46f8-b1f4-268473aa22f9" >
+				<ee:message >
+					<ee:set-payload resource="dwl/fetch-contracts/p-error-case-data.dwl" />
+				</ee:message>
+			</ee:transform>
+			<async doc:name="Async" doc:id="737d2566-3482-46d1-acc8-5279f933dade" >
+				<flow-ref doc:name="Refer to mf-case-creation" doc:id="fc6ad8df-820e-4d4c-a8fc-f8159c3f84fe" name="mf-case-creation"/>
+			</async>
+			<ee:transform doc:name="DW SET Error Message for Support Ticket" doc:id="9ab820fb-4852-4e6e-a6c9-5f0ffa72b63e" >
+				<ee:message >
+					<ee:set-payload resource="dwl/fetch-contracts/p-error-support-ticket-data.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="e203dd29-b42c-494e-8b85-7d0d6f8506d4" name="cf-invoke-support-ticket-service" target="supportTicketPayload"/>
+		</on-error-continue>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="62adfe12-34eb-486c-8816-ab9b151d2047" type="ANY">
+			<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="739c85ba-36fd-4b33-9ed0-e1ff97230d49" message='Fetch Contracts : Error sending Contracts to C-Sight due to #[error.detailedDescription] ' />
+			<ee:transform doc:name="DW SET Case Request" doc:id="7430ae63-6278-4460-880f-964562b5d235" >
+				<ee:message >
+					<ee:set-payload resource="dwl/fetch-contracts/p-error-case-data.dwl" />
+				</ee:message>
+			</ee:transform>
+			<async doc:name="Async" doc:id="cdb62dc3-786d-4ca9-aed5-c10df212d57e" >
+				<flow-ref doc:name="Refer to mf-case-creation" doc:id="8b8c2b16-fc05-4d40-9b56-6c0adcc451c5" name="mf-case-creation"/>
+			</async>
+			<ee:transform doc:name="DW SET Error Message" doc:id="6da1af20-2635-4073-a184-e3a8df40af01" >
+				<ee:message >
+					<ee:set-payload resource="dwl/fetch-contracts/p-error-notification-data.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="8ed88d9e-f601-406f-b2c0-3803515da5e5" name="cf-invoke-notification-service" />
+		</on-error-continue>
+	</error-handler>
+</mule>

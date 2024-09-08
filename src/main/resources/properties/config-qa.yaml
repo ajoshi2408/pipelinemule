@@ -1,0 +1,394 @@
+serviceName: "Salesforce-Inbound-System-Service"
+assignmentGroup: "Service Platform"
+template: "COMMON-ERROR-TEMPLATE"
+https:
+  private:
+    host: 0.0.0.0
+    port: "8092"
+  basePath: "/api/v1/*"
+  idleTimeout: "50000"
+  readTimeout: "90000"
+  certificate:
+    keystore: "certs-sfss-inbound/${env}/salesforce-inbound-system-service-keystore.jks"
+api:
+  id: "18855754"
+    
+###--------------Notification Service--------------###
+notification-system-service:
+  host : "mule-worker-internal-${env}-notification-system-service.cloudhub.io"
+  path : "notifications/emails"
+  port: "8092"
+  basePath : "v1"
+  asyncValue: "true"
+  responseTimeOut: "90000"
+  connectionTimeOut: "30000"
+  reconnection:
+    attempts: "2"
+    frequency: "2000"
+  tmw990:
+    cc: "mulesoftdev@crowley.com"
+    email: "QATCoE-Logistics@crowley.com"
+    
+###--------------Support Ticket Service--------------### 
+support-system-service:
+  host : "mule-worker-internal-${env}-support-ticket-system-service.cloudhub.io"
+  path : "support-ticket-service/incidents"
+  port: "8092"
+  responseTimeOut: "90000"
+  basePath : "v1"
+  email : "mulesoftdev@crowley.com"
+  cc : "mulesoftdev@crowley.com"
+  connectionTimeOut: "30000"
+  reconnection:
+    attempts: "2"
+    frequency: "2000"
+  assignmentGroup:
+    tmw990: "Service Platform"
+    baplieFinal: "Service Platform"
+    cusres: "Service Platform"
+    
+#-----------Database Details-----------
+sql:
+  database: "CrowleyServicePlatformQA"
+  host: "CrowleyServicePlatformQA.MSSQL.CROWLEY.COM"
+  table: "SalesforceSystemService"
+  user: "_sqlcspqasvc"
+  port: "1433"
+  reconnection:
+    attempts: "2"
+    frequency: "2000"
+    
+###--------------Salesforce Configuration--------------###
+salesforce:
+  host: "test.salesforce.com"
+  case:
+    host: "crowley2--qa.sandbox.my.salesforce.com"
+    path: "/services/apexrest/automationCaseMapping"
+  port: "443"
+  serviceVersion: "v52.0"
+  username : "integration.admin@crowley.com.qa"
+  authorizationurl: "https://test.salesforce.com/services/Soap/u/51.0"
+  tokenUrl: "https://test.salesforce.com/services/oauth2/token"
+  serviceUrl: "/services/data/v51.0"
+  contentVersionUrl: "/services/data/v51.0/sobjects/contentVersion/"
+  retry: "2"
+  connectionTimeout: "90"
+  responseTimeout : "90000"
+  reconnectionFrequency : "2000"
+  authUrl: "/services/oauth2/token"
+  composite:
+    connectionTimeout: "90"
+    responseTimeout: "90"
+  forEachBatchSize: "200"
+
+###--------------KAFKA Details--------------###
+kafka:
+  bootstrapservers: "pkc-4nym6.us-east-1.aws.confluent.cloud:9092"
+  consumer:
+    username: "Z4LJTVW2DA3DNKDI"
+    groupId: "salesforce-inbound-system-service"
+    topic: 
+      tmw990: "${env}-tender-acknowledgement"
+      creditAccount: "${env}-account-credit-event"
+      customerVendor: "${env}-customervendor-events"
+      baplieFinal: "${env}-baplie-final-event"
+      cusres: "${env}-cusres-event"
+      contractConf: "${env}-contracts-events"
+
+###--------------tmw990--------------###
+tmw990:
+  kafka:
+    reconnection:
+      attempts: "2"
+      frequency: "2000"
+
+###------------Case-Creation------------------------###
+case:  
+  salesforce:
+    origin: "Platform Automations"
+    priority: "Medium"
+  requestorResource : "CASE-CREATION"
+
+###--------------Cache Details--------------###
+cache:
+  ttl: "300000"
+  expiration: "1000"
+  maxEntries: "1"
+
+###--------------Oracle Credit Info--------------###
+credit:
+  initial:
+    state: "started"
+  batchsize: "5000"
+  sfQuery: "SELECT CDM_Org_Id__c,Id FROM Account WHERE CDM_Org_Id__c IN"  
+  vmConsumer: "4"
+  toRecipients: "qatcoe-logistics@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"
+  emailTemplateConfigStoreKey: "SALESFORCE-CREDIT-SERVICE-TEMPLATE"
+  summaryTemplateConfigStoreKey: "SALESFORCE-CREDIT-SUMMARY-TEMPLATE"
+  case:
+   subject: "Account not found in Salesforce"
+   description: "Account not found in Salesforce to update Credit Information for"
+   batchSize: "1"
+  update:
+    batchSize: "200"
+    error:
+      batchSize: "1"  
+  partyUsageCode: "customer"
+  sql:
+    selectQuery: "SELECT [Value] FROM CreditAccountDetails where [Id]= :docId and RetrievalStatus = 0"
+    updateQuery: "UPDATE CreditAccountDetails SET RetrievalStatus = 1 where [Id] = :docId and RetrievalStatus = 0"   
+  kafka:
+    reconnection:
+      attempts: "2"
+      frequency: "2000"
+
+###--------------VM Details--------------###
+vm:
+  queueName:
+    credit: "credit-info-event"
+    hacienda: "hacienda-post-event"
+    customerVendor: "customer-vendor-post-event"
+    fetchContract: "fetch-contract"
+  timeout: "30"
+  reconnection:
+    frequency: "2000"
+    attempts: "2"
+
+
+###--------------BAPLIE Details--------------###
+baplie:
+  final:
+    queue: "baplie-final-queue"
+    emailTemplateConfigStoreKey: "BAPLIE-FINAL-TEMPLATE"
+    vm:
+      consumers: "4"
+      timeout: "5"
+      
+
+###--------------MDM Details---------------###
+MDM:
+  toRecipients: "QATCoE-Logistics@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"
+  failedRecordsTemplate: "SALESFORCE-MDM-FAILED-RECORDS-TEMPLATE"
+  errorTemplate: "SALESFORCE-MDM-ERROR-TEMPLATE"
+  batchSize: "500"
+
+###-------------Truck Carriers Interface Configuration--------------###
+truck:
+  sftp:
+    host: "sftpeastdev.crowley.com"
+    port: "22"
+    username: "UIIA"
+    directory:
+      path:  "/uiia-835509477204/UIIA/"
+      input: "RPA Ingested/"
+      archive: "Archive/"
+      error: "Error/"
+    matcher:
+      filePattern:  "CMCU_*.xml"
+    scheduler:
+      frequency: "10"
+    timeout:
+      connection: "60"
+      response: "60"
+    reconnection:
+      frequency: "120000"
+      retry: "2"
+    initialState: "stopped"
+    maxconcurrency: "1"
+  sfcomposite:
+    url: "/services/data/v56.0/sobjects/Trucker_SCAC__c/Trucker_SCAC_Code__c/"
+    method: "PATCH"
+    batchSize: "25"
+  vm:
+    queue: "truck-carriers-data-queue"
+    timeout: "30"
+    consumer: "4"
+  emailTemplate:
+    dataIssue: "TRUCK-CARRIERS-DATA-ISSUE-TEMPLATE"
+    muleIssue: "TRUCK-CARRIERS-MULE-ISSUE-TEMPLATE"
+     
+###--------------Hacienda--------------###
+hacienda:
+  maxconcurrency: "1"
+  recordId : "0127c000000DDm4"
+  ftp:
+    host : "jaxapps01.crowley.com"
+    port: "21"
+    username: "ftphaciendasju"
+    path : "/HaciendaSJU/Docs_DevOnly/"
+    cics:
+      path : "/HaciendaSJU/CICS_Docs_DevOnly/"
+    error:
+      path : "/HaciendaSJU/Mule_Error_DevOnly/"
+    mulearchive:
+      path : "/HaciendaSJU/Archive_Docs_DevOnly/"
+    frequency : "15"
+    filesize:
+      frequency : "2"
+    connectiontimeout: "90"
+    responsetimeout: "90"
+    reconnectionFrequency: "2000"
+    retry: "2"
+    fileNamePattern: "LOT*.NCD"
+    minEvictionMillis : "10000"
+    evictionCheckIntervalMillis: "10000"
+    maxActive: "5"
+    maxIdle: "5"
+    maxWait: "5"
+  batchSize: "25"
+  sfcomposite:
+    url: "/services/data/v56.0/sobjects/Hacienda__c/Hacienda_unique_key__c/"
+    method: "PATCH"
+  initial:
+    state : "stopped"
+  emailTemplateConfigStoreKey: "HACIENDA-SERVICE-TEMPLATE"
+  cicsEmailTemplateConfigStoreKey: "HACIENDA-SERVICE-FTP-TO-CICS-TEMPLATE"
+  vm:
+    timeout: "60"
+    consumers: "4"
+  toRecipients: "qatcoe-logistics@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"
+  cicsToRecipients: "qatcoe-logistics@crowley.com"
+
+#-----------------Payment Receipts Configs------------------------#
+paymentReceipts:
+  batchSourceName: "Legacy AR"
+  errorTemplate:  "PAYMENT-RECEIPTS-SERVICE-TEMPLATE"
+  toRecipients: "qatcoe-logistics@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"
+  upsertSize: "200"
+  caseCreationSize: "1"
+  compositeVersion: "v52.0"
+  compositeURL: "/services/data/"
+  compositeGETQueries:
+   bol: "SELECT Id, Bill_Of_Lading_Number__c FROM Bill_Of_Lading__c WHERE Bill_Of_Lading_Number__c IN "
+   booking: "SELECT Id, Booking_Number__c FROM Booking__C WHERE Booking_Number__c IN "
+   cvif: "SELECT Id, CVIF__c FROM Account WHERE CVIF__c IN "
+   invoice: "SELECT Id,Invoice_Number__c, Payment_date_Time__c from Payment_Receipt__c where Invoice_Number__c IN "
+
+###--------------Customer Vendore Details--------------###
+customer-vendor-business-service-2:
+  host : "mule-worker-internal-${env}-customer-vendor-business-service-2.us-e1.cloudhub.io"
+  path : "customer"
+  port: "8091"
+  basePath : "api"
+  connectionTimeOut: "30000"
+  responseTimeOut: "90000"
+  reconnection:
+    attempts: "2"
+    frequency: "2000"
+rest:
+  retry: "2"
+  millisecondretry: "10000"
+
+####--------------CDM to SF Details--------------###
+cdm:
+  initial:
+    state: "started"
+  integration:
+    user: "cdm_integration_user"
+  siteUseType: "POS_PAY,PAY_TO,PAY,PURCHASING,POS_PUR,POS_RFQ,RFQ"
+  partyUsageCode: "CUSTOMER"
+  email:
+    toRecipient: "integrationdebugging@crowley.com"
+    ccRecipient: "mulesoftdev@crowley.com"
+  account:
+    partytype:
+      value: "ORGANIZATION"
+    template: "CDM-SALESFORCE-ACCOUNTS-TEMPLATE"
+  location:
+    key: "SF"
+    endDateActive: "4712-12-31"
+    status: "A"
+    city: "Singapore"
+    country: "SG"
+    value: "US"
+    nonUS:
+      stateCountry: "JP,DE,GT,HN,SV,TT,JM,HT,MX,PR,KY"
+      provinceCountry: "VG,VI,CA,CN,CR,PA,NI,DO"
+    template: "CDM-SALESFORCE-BUSINESSLOCATIONS-TEMPLATE"
+  contact: 
+    PhoneLineType: "GEN"
+    MPhoneLineType: "MOBILE"
+    workphone: "Work Phone"
+    flagvalue: "true"
+    template: "CDM-SALESFORCE-CONTACTS-TEMPLATE"
+  sf:
+    username: "integration.admin@crowley.com.qa"
+    authorizationurl: "https://test.salesforce.com/services/Soap/u/51.0"
+
+    
+###--------------Cusres Details--------------###
+cusres:
+  emailTemplateConfigStoreKey: "CUSRES-ERROR-TEMPLATE"
+  vm:
+     consumers: "4"
+     timeout: "5"
+     queue: "vm-cusres-queue"
+  kafka:
+    reconnection:
+      attempts: "2"
+      frequency: "2000"
+        
+###--------------START AWS Configurations--------------###   
+aws:
+  s3:
+    bucketName: "partnermanager-files"
+    connection.timeout: "5000"
+    frequency: "2000"
+    attempts: "2"
+###--------------START Riskonnect Configurations--------------###   
+riskonnect:
+  toRecipients: "maxwell.gomes@crowley.com"
+  ccRecipients: "maxwell.gomes@crowley.com"
+  errorTemplate: "SALESFORCE-BILL-VOYAGE-ERROR-TEMPLATE"
+  assignmentGroup: "Service Platform"
+###--------------Fetch Contract--------------###
+fetchContract:
+  locp: "PORT"
+  locr: "RAIL RAMP"
+  locc: "WAREHOUSE"
+  loc: "Location"
+  zip: "ZipCode"
+  pterm: "P"
+  rterm: "R"
+  cterm: "C"
+  dterm: "D"
+  yterm: "Y"
+  message: "PROCESSING_HALTED"
+  expstatus: "EXPIRED"
+  Objcontract: "Contract"
+  devstd: "Standard"
+  devamt: "Amendment"
+  status: "SIGNED"
+  forEach.batchSize: "200"
+  forEach.rest.batchSize: "5"
+  toRecipients: "mulesoftdev@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"
+  emailTemplateConfigStoreKey: "FETCH-CONTRACT-SERVICE-TEMPLATE"
+  case:
+    origin: "Platform Automations"
+    ownerId: "00G8D000000ZjF2UAK"
+    recordTypeId: "0128D000000LjXyQAK"
+    issueType: "Contract Failure"
+    priority: "High"
+    autoCaseIdentifier: "MS - Contract Failure"
+
+##----------- EDI300 Booking Process----------##
+booking:
+   toRecipients: "mulesoftdev@crowley.com"
+   ccRecipients: "mulesoftdev@crowley.com"
+   template: "EDI300-BOOKING-TEMPLATE"
+   
+##----------- DCS ----------##
+DCS: 
+  errorTemplate: "DCS-SALESFORCE-ERROR-TEMPLATE"
+  caseTemplate: "DCS-SALESFORCE-CASE-TEMPLATE"
+  caseOwner:  "00G7c000003hNFp"
+  recordType: "0127c000000H0OHAA0"
+  casePriority: "Medium"
+  autoCaseIdentifier: "MS - DCS Failure"
+  toRecipients: "mulesoftdev@crowley.com"
+  ccRecipients: "mulesoftdev@crowley.com"

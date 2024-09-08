@@ -1,0 +1,16 @@
+{
+  "subject": "Account not found in Salesforce",
+  "errorMessage": "Account not found in Salesforce to update Credit Information for Party Id: 300000161796341, Account Number:7069596, Credit Limit: 0, Account Status: NO CREDIT, Credit Terms: NET 30, Doc Id: 25",
+  "emailTemplateConfigStoreKey" : "CREDIT-NOTE-SERVICE-TEMPLATE",
+  "errorDescription" : "Error Occurred in Credit Case Creation flow for Party Id Test123",
+  "caseDetailsRequired": false,
+  "bookingNumber" : "CAT000009",
+  "bolNumber" : "CWPS3M003169",
+  "contract" : "20-00381",
+  "origin" : "Platform Automations",
+  "ownerId"  : "00G5G000004geqhUAA",
+  "recordTypeId" : "0125G000001cm05QAA",
+  "pricingType" : "Publishing",
+  "issueType" : "Pricing Issue",
+  "resolutionCategory" : "Credit Note Upload"
+}

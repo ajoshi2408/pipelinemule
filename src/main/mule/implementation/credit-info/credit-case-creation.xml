@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="mf-credit-case-creation" doc:id="557d206c-1a14-46da-acc2-3d8ff7d8fa86" >
+		<remove-variable doc:name="REMOVE FV sfQuery" doc:id="7bcb329a-07d1-4d00-8862-f578cb160303" variableName="sfQuery" />
+		<remove-variable doc:name="REMOVE FV sfResponse" doc:id="2eba97fd-2031-47b0-b3d4-e7f322aa2b98" variableName="sfResponse" />
+		<logger level="INFO" doc:name="LOG INFO - Credit Case Creation Flow [Start]" doc:id="b950ec8a-a645-4cfc-8268-a0409b4999a2" message="[Credit-Info] SF Case Creation Flow Starts for DocId : #[ vars.docId]" />
+		<ee:transform doc:name="DW  SET FV errorInfo" doc:id="69c55661-eb63-4e8c-9704-dc171e167453">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="errorInfo"><![CDATA[output application/java
+var errorString = "Error Occurred in Credit Case Creation flow "
+---
+ShortDescription : errorString]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="DW filter payload for case" doc:id="4bd66a02-80f3-4e8a-811a-d95065855c16">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload filter (vars.noacc contains $.PARTY_ID)
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+		<foreach doc:name="For Each Account - Call Case Creation" doc:id="976f9134-b951-4bb7-a2e1-961b90b5c148" collection="#[payload]" batchSize="${credit.case.batchSize}">
+					<ee:transform doc:name="DW Map PL for case creation, set common vars for case creation" doc:id="7340f5ab-0abe-469a-a896-8c7ae535744e">
+						<ee:message>
+							<ee:set-payload resource="dwl/credit-info/p-credit-sf-case-creation-request.dwl" />
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable variableName="inputPartyId"><![CDATA[%dw 2.0
+output application/java
+---
+payload.PARTY_ID]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+			<set-variable value="#[payload.errorMessage]" doc:name="FV SET errorMessage for case creation email notifications" doc:id="5890d91f-18c9-4813-8d3b-6094bf1c8515" variableName="errorMessage" />
+					<logger level="DEBUG" doc:name="LOG DEBUG Case creation Request" doc:id="d80713ec-b958-46d8-ad06-c13a58d20dd2" message="[Credit-Info] Case Request for #[payload]  DocId : #[ vars.docId]" category="com.crowley.sf.inbound.credit.info" />
+					<flow-ref doc:name="Refer to mf-case-creation" doc:id="4c6f81e9-5dd0-4f53-852f-8a6140e518d3" name="mf-case-creation" />
+					<choice doc:name="CHECK IF Case created successfully" doc:id="1bc7867c-38a5-40b4-9665-5bb60d1b00a4">
+						<when expression='#[payload.Message == "Success"]'>
+							<ee:transform doc:name="DW SET Case Creation Message" doc:id="ab19ebb8-6a6e-4dd0-93d2-92ddc87e4c36">
+								<ee:message>
+									<ee:set-payload resource="dwl/credit-info/p-notification-credit-case-created.dwl" />
+								</ee:message>
+							</ee:transform>
+					<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="ac93966d-048a-4e85-8a2a-f9264a3869b3" name="cf-invoke-notification-service" />
+						</when>
+						<otherwise>
+							<logger level="INFO" doc:name="LOG INFO Case Creation Failed" doc:id="1ef28b49-46af-4f12-ba3b-49999b6cfe62" message="[Credit-Info] Case Creation Failed. PartyId : #[vars.inputPartyId] DocId : #[vars.docId] " />
+						</otherwise>
+					</choice>
+				</foreach>
+		<logger level="INFO" doc:name="LOG INFO - Credit Case Creation Flow [End]" doc:id="4e820fc4-317e-40be-802a-c1917f20ba7b" message="[Credit-Info] SF Credit Case Creation Flow Ends for DocId : #[vars.docId]" />
+		<error-handler ref="credit-info-common-error-handler" />
+	</flow>
+</mule>

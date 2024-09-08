@@ -1,0 +1,146 @@
+#%RAML 1.0 DataType
+displayName: Payment Receipt request
+description: This is the payment receipt request to be updated in salesforce system.
+type: array
+items: 
+ type: object
+ properties:
+   invoiceNumber: 
+     type: string | nil
+     description: "Key is mandatory"
+     required: false
+   party:
+     type: object
+     properties:
+       code:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+       cvif:
+         type: object
+         properties:
+           "number":
+             type: string | nil
+             description: "Key is mandatory"
+             required: false
+           locationCode: 
+             type: string | nil
+             description: "Key is mandatory"
+             required: false
+   openItem:
+     type: object
+     properties:
+       amount:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+   agingDate:
+     type: string | nil
+     description: "Key is mandatory"
+     required: false                   
+   batch:
+     type: object
+     properties:
+       "number":
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+       "date":
+         type: string | nil
+         description: "Key is mandatory"
+         required: false        
+       sourceName:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+   acountingPeriod:
+     type: string | nil
+     description: "Key is mandatory"
+     required: false
+   ar:
+     type: object
+     properties:
+       company:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false            
+   check:
+     type: object
+     properties:
+       "number":
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+       "date":
+         type: string | nil
+         description: "Key is mandatory"
+         required: false 
+   payorName:
+     type: string | nil
+     description: "Key is mandatory"
+     required: false              
+   recordHistory:
+     type: object
+     properties: 
+       creationDate:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+       lastUpdatedDate:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+       lastUpdatedBy:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false         
+   fcnDate:
+     type: string | nil
+     description: "Key is mandatory"
+     required: false
+   depositDate:
+     type: string | nil
+     description: "Key is mandatory"
+     required: false
+   payment:
+     type: object
+     properties: 
+       amount:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+   booking:
+     type: object
+     properties: 
+       "number":
+         type: string | nil
+         description: "Key is mandatory"
+         required: false         
+   originalInvoice:
+     type: object
+     properties: 
+       amount:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false
+   billOfLading:
+     type: object
+     properties: 
+       "number":
+          type: string | nil
+          description: "Key is mandatory"
+          required: false         
+   receiptCurrency:
+     type: object
+     properties: 
+       code:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false         
+   transaction:
+     type: object
+     properties: 
+       currencyCode:
+         type: string | nil
+         description: "Key is mandatory"
+         required: false                             

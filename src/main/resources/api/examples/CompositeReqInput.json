@@ -1,0 +1,15 @@
+{
+  "allOrNone": true,
+  "compositeRequest": [
+    {
+      "method": "GET",
+      "referenceId": "refRecordTypeId",
+      "url": "/services/data/v52.0/query/?q=SELECT Id , DeveloperName FROM RecordType WHERE SobjectType = 'US_Customs_Port_Release__c'"
+    },
+    {
+      "method": "GET",
+      "referenceId": "refVesselEvents__cId",
+      "url": "/services/data/v52.0/query/?q=SELECT Id,Est_Arrival_Date_Time__c,Sequence__c,Voyage_Schedule__c FROM VesselEvents__c where recordtype.name = 'Master Vessel Event'and Name = 'USPEF' and Customs_Declaration_Number__c = 'N2137' and Voyage_Schedule__r.Name = 'NZV2137'"
+    }
+  ]
+}

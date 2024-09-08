@@ -1,0 +1,27 @@
+[
+{
+  "AddressSTprovID": 31,
+  "Sublocation Type": "BERTH",
+  "SUADDRESSCODE": "0314684-09",
+  "AddressCountry": "AG",
+  "LASTUPDATE_TIMESTAMP_ADRESSE": "2022-02-09T17:24:34.486087",
+  "Is Ramp": "N",
+  "Route Zip": null,
+  "AddressCity": "St John's, Antigua",
+  "Sublocation Name": "Saint John's Term, Antigua",
+  "Hide": "N",
+  "AddressText1": "CARIBBEAN MARITIME SERVICES LTD",
+  "AddressText2": null,
+  "AddressSTabbr": "04",
+  "LASTUPDATE_TIMESTAMP_PROVINCE": "2022-02-09T17:24:40.561165",
+  "AddressPostalCode": null,
+  "Location": "AGSJO",
+  "Sublocation": "SJOT001",
+  "CVIF - future": "0314684",
+  "AddressStreet3": null,
+  "AddressSTname": "Saint John",
+  "AddressStreet2": "PO BOX 120, ST JOHN'S",
+  "CVIF - now": "0314684",
+  "AddressStreet1": "QUEEN ELIZABETH HWY"
+}
+]

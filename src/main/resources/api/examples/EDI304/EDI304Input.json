@@ -1,0 +1,477 @@
+{
+	"billoflading": {
+		"blNumber": "JAXS0M05910611",
+		"boldetail": {
+			"label": "BGI8 RSP MM/DD/YYYY HH:MM REQUESTER ID: CICSBKG",
+			"senderID": "ABC123",
+			"receiverID": "ABC123",
+			"originVoyage": "NZV9125S",
+			"shipmentNbr": "CAT090246",
+			"status": "RR",
+			"modeType": "CM",
+			"moveType": "HH",
+			"moveTypeDescription": "HOUSE TO HOUSE",
+			"type": "R",
+			"source": "EDI",
+			"initiateDate": "2020-02-12",
+			"issueDate": "2020-02-12",
+			"supplementaryInd": false,
+			"firstRrStatus": "2020-02-12",
+			"ediSourceindicator": true,
+			"ediId": "CZAPR19070080",
+			"idReceivedDate": "2020-02-12",
+			"idReceivedTime": "08:34:12",
+			"prepayCollectCd": "CO",
+			"routeCd": "D",
+			"hazInd": false,
+			"hazEmerContact": "CHEMTREC",
+			"hazEmerPhone": "88888888888",
+			"hazEmerPhone2": "77777777777",
+			"militaryVesVoyNbr": "2002",
+			"militaryRefNbr": "AAFES",
+			"militaryMoveCd": "KK2",
+			"origDodaccCd": "W902T3",
+			"destDodaccCd": "C70107",
+			"rateClerkInitials": "GC",
+			"sedExemptInd": true,
+			"xReferenceBlNumber": "BARN7M000040",
+			"memoXReferenceBlNumber": "COSN6M875907",
+			"scacCd": "CPRC",
+			"exportReferenceNumber": "2027993LR 5662605LT",
+			"einReferenceNumber": "98-1432376",
+			"taxIdNumber": "P10044",
+			"vgmTotalWeightLbs": "51595",
+			"vgmTotalWeightKg": "19346",
+			"bolCtlLoc": "USJAX",
+			"bolMetricInd": "N",
+			"itnNumber": "1234567",
+			"tarrifType": "P",
+			"inBondInd": "Y",
+			"sedExemptCode": "OPT4",
+			"sedExemptOpt4Dt": "20200212",
+			"altVessel": "CARIBE NAVIGATOR",
+			"altLoadPort": " NC US PORT",
+			"altDischargePort": "SANTO TOMAS",
+			"altPlaceReceipt": " NC US PORT",
+			"altFinalDest": "NORTH HAVEN, CT",
+			"altLoadTerminal": "RIO HAINA, DR",
+			"purposeCode": "00",
+			"processResultId": "12345678901234567890"
+		},
+		"locations": {
+			"loadPort": {
+				"loadPortAbbr": "USJAX",
+				"loadPortDesc": "JACKSONVILLE",
+				"loadPortSt": "FL",
+				"loadPortCo": "US",
+				"loadPortDate": "2020-06-15"
+			},
+			"dschPort": {
+				"dschPortAbbr": "PRSJU",
+				"dschPortDesc": "SAN JUAN",
+				"dschPortSt": "PR",
+				"dschPortCo": "US",
+				"dschPortDate": "2020-06-15"
+			},
+			"bolLoadPort": {
+				"bolLoadPortAbbr": "USJAX",
+				"bolLoadPortDesc": "JACKSONVILLE, FL",
+				"bolLoadPortSt": "FL",
+				"bolLoadPortCo": "US",
+				"bolLoadPortDate": "2020-06-15"
+			},
+			"bolDschPort": {
+				"bolDschPortAbbr": "PRSJU",
+				"bolDschPortDesc": "SAN JUAN",
+				"bolDschPortSt": "PR",
+				"bolDschPortCo": "US",
+				"bolDschPortDate": "2020-06-15"
+			},
+			"blPointOfOrigin": {
+				"PointOfOriginAbbr": "USJAX",
+				"PointOfOriginDesc": "JACKSONVILLE",
+				"PointOfOriginSt": "FL",
+				"PointOfOriginCo": "US",
+				"PointOfOriginDate": "2020-06-15"
+			},
+			"blPlaceOfReceipt": {
+				"PlaceOfReceiptAbbr": "USJAX",
+				"PlaceOfReceiptDesc": "JACKSONVILLE",
+				"PlaceOfReceiptSt": "FL",
+				"PlaceOfReceiptCo": "US",
+				"PlaceOfReceiptDate": "2020-06-15"
+			},
+			"blFinalDest": {
+				"finalDestAbbr": "PRSJU",
+				"finalDestDesc": "SAN JUAN",
+				"finalDestSt": "PR",
+				"finalDestCo": "US",
+				"finalDestDate": "2020-06-15"
+			},
+			"blRelayPoint": {
+				"relayPointAbbr": "DOCAU",
+				"relayPointDesc": "CAUCEDO, DR",
+				"relayPointSt": "DO",
+				"relayPointCo": "DO",
+				"relayPointDate": "2020-06-15"
+			},
+			"blReleaseLoc": {
+				"releaseLocAbbr": "USJAX",
+				"releaseLocDesc": "JACKSONVILLE",
+				"releaseLocSt": "FL",
+				"releaseLocCo": "US",
+				"releaseDate": "2020-06-15"
+			},
+			"overRideValues": {
+				"placeOfReceiptLn1": "JACKSONVILLE PORT",
+				"placeOfReceiptLn2": "MORE TEXT",
+				"bolLoadPortLn1": "WILMINGTON",
+				"bolLoadPortLn2": "US PORT",
+				"bolLoadPierTermLn1": "RIO HAINA PORT",
+				"bolLoadPierTermLn2": "MORE TEXT",
+				"bolDischPortLn1": "SANTO TOMAS",
+				"bolDischPortLn2": "GUATEMALA",
+				"placeOfDlvryLn1": "NORTH HAVEN, CT",
+				"placeOfDlvryLn2": "MORE TEXT",
+				"ovrdVoyageLn1": "SANTO TOMAS,",
+				"ovrdVoyageLn2": "GUATEMALA, C.A.",
+				"ovrdVoyageLn3": "MORE TEXT",
+				"ovrdVoyageLn4": "PORT EVERGLADES, FL"
+			}
+		},
+		"routings": [
+			{
+      "blRoutingInstr": {
+        "InstructionLine": "DISCHARGE AT JAMAICA FOR TRANSSHIPMENT TO MONTEGO BAY."
+      }
+      }
+		],
+		"parties": [
+			{
+				"party": {
+					"Type": "SHP",
+					"UniqueNbr": "0001",
+					"Cvif": "6245560",
+					"CvifLocCd": "01",
+					"custLocationType": "93",
+					"custLocation": "TradePartnerValue",
+					"Name": "SMITH LOGISTICS INTERNATIONAL",
+					"defaultFederalTaxId": "20-1043281 ",
+					"BillToInd": "N",
+					"ChbNbr": "6926",
+					"FmcNbr": "3412343",
+					"address1": "1400 NW 79TH AVE",
+					"address2": "",
+					"city": "MIAMI",
+					"state": "fl",
+					"zip": "33126",
+					"country": "USA",
+					"partyReference": "ABC123",
+					"Addresses": [
+						{
+							"address1": "1400 NW 79TH AVE"
+						},
+						{
+							"address2": "MIAMI FL 33126 US"
+						},
+						{
+							"address3": "PH:789-4760700"
+						},
+						{
+							"address4": "ACBOCEAN@ADVANCECUSTOMSBROKERS.COM"
+						},
+						{
+							"Phone": "8889997777"
+						},
+						{
+							"Email": "any@any.com"
+						}
+					]
+				}
+			}
+		],
+		"billItems": {
+			"itemDetail": [
+				{
+					"Seq": "0100",
+					"OrigVoy": "DOM6083S",
+					"LoadPort": "USJAX",
+					"LoadPortSeq": "1",
+					"DschPort": "PRSJU",
+					"DschPortSeq": "1",
+					"CmtyTypeCd": "BB",
+					"RateAuthType": "T",
+					"AuthNbr": "702",
+					"UnitQty": "95",
+					"Unitofmeasure": "40FT",
+					"ForgeinUnitofmeasure": "40FT",
+					"Weight": "15820.38",
+					"WeightType": "G",
+					"WeightUnitofmeasure": "KGS",
+					"WeightLb": "34877.97",
+					"WeightKg": "15820.38",
+					"Cube": "1827.390",
+					"Cubefeet": "1827.390",
+					"Cubemeters": "51.746",
+					"ScheduleType": "B",
+					"ScheduleBNbr": "000010000000",
+					"ShiprDeclareValue": "0",
+					"EquipCt": "1",
+					"HazInd": "N",
+					"MovetypeCd": "HH",
+					"FreightType": "NOS",
+					"ManifestQty": "1884",
+					"ManifestUom": "Box",
+					"TliHcChptrHdr": "1000",
+					"TliHcSubHdr": "99",
+					"TliUserCmdyNbr": "1000",
+					"TliId": "1548",
+					"TliSrvcCtrt": "95",
+					"TliNbr": "1000991000154895",
+					"SubItemInd": "N",
+					"ServiceContractNum": "001234",
+					"itemMetricInd": "N"
+				}
+			]
+		},
+		"itemsText": [
+			{
+				"detail": {
+					"itemSeq": "0100",
+					"textType": "DSC",
+					"textLang": "E",
+					"textBlockNumber": "0001",
+					"txtLines": "First43chars|Next43chars|and so on"
+				}
+			}
+		],
+		"subItems": {
+			"detail": [
+				{
+					"itemSeq": "0100",
+					"itemUniqNumber": "0001",
+					"equipPrefix": "",
+					"equipNumber": "",
+					"dockReceiptNumber": "",
+					"unitQty": "",
+					"unitofmeassure": "VEH",
+					"foreignUnitofmeasure": "",
+					"weight": "2132",
+					"weightUnitofmeasure": "KGS",
+					"weightLb": "5366.05",
+					"weightKg": "2434.00",
+					"weightType": "G",
+					"cube": "20.022",
+					"cubeFeet": "707.070",
+					"cubeMeter": "20.022",
+					"cubeUnitofmeasure": "E",
+					"ScheduleType": "B",
+					"scheduleBNumber": "",
+					"shipperDeclararedVal": "0",
+					"hazIndicator": "Y",
+					"subitemMetricInd": "N"
+				}
+			],
+			"subItemsText": [
+				{
+					"stxDetail": {
+						"sequence": "0100",
+						"uniqueNumber": "0010",
+						"type": "DSC",
+						"language": "E",
+						"blockNumber": "0001",
+						"lines": "2020 CHEVROLET TAHOE 4WD LS 1GNSKAKC8LR219361"
+					}
+				}
+			]
+		},
+		"commodities": [
+			{
+				"commodity": {
+					"itemSequence": "0100",
+					"uniqueNumber": "0001",
+					"equipmentPrefix": "CMCU",
+					"equipmentNumber": "2009682",
+					"cargoReceivedLocation": "USJAX",
+					"dockReceiptNumber": "J109424",
+					"description": "COMMODITY DESCRIPTION HERE",
+					"typeCode": "SLC",
+					"cargoUnitQty": "10",
+					"cargoUnitofmeasure": "CNTR",
+					"cargoItemWeight": "13824.00",
+					"cargoWeightunitofmeasure": "KGS",
+					"cargoWeightType": "G",
+					"cargoCube": "3190.320",
+					"cargoCubeUnitofmeasure": "M3",
+					"militaryMoveCode": "KM2",
+					"militaryEquipmentSeqNumber": "9999",
+					"comTransCntlNbr": "HX8PUW3842 KM2",
+					"partialLoadInd": "N",
+					"comRwKdEquipPrfx": "TMTZ",
+					"comRwkdEquipNbr": "52817",
+					"comRwkdPortCd": "SJU",
+					"comValue": "43678.95",
+					"comCmdtyCdType": "J",
+					"comCmdtyCd": "8502390010",
+					"comCdDesc": "ELECTRIC GENERATING SETS",
+					"modelYear": "2019",
+					"make": "GMC",
+					"model": "YUKON",
+					"color": "BLACK",
+					"vin": "12324RDGFBHT666",
+					"hazUnNa": "UN1900",
+					"hazProperName": "PROPER SHIPPING NAME",
+					"hazTechName": "TECHNICAL NAME",
+					"hazDescription": "HAZMAT PRODUCT DESCRIPTION",
+					"hazDotClass": "6.1",
+					"hazClassType": "I",
+					"hazImoClass": "2.3",
+					"hazSubHazard2": "8.9",
+					"hazSubHazard1": "8",
+					"hazPkgGroup": "III",
+					"hazFlashPoint": "56",
+					"hazFlashPointUom": "F",
+					"hazLimitedQtyInd": "Y",
+					"hazMpiInd": "Y",
+					"hazReportQtyRequiredInd": "Y",
+					"hazReportableQty": "200",
+					"commodityMetricInd": "N",
+					"tariffTypeCd": "P"
+				}
+			}
+		],
+		"freeTexts": [
+			{
+				"fftDetail": {
+					"type": "DSC",
+					"language": "E",
+					"blockNumber": "0003",
+					"lines": "BILL OF LADING IS THE ACCURATE VERIFIED GROSS MASS (VGM) OF THOSE"
+				}
+			}
+		],
+		"referenceNumbers": [
+			{
+				"refDetail": {
+					"type": "IL",
+					"number": "BRN-999999",
+					"ediReferenceType": "IL",
+					"subType": ""
+				}
+			}
+		],
+		"voyages": [
+			{
+				"voyage": {
+					"voyage": "CAR0003N",
+					"loadPort": "USJAX",
+					"loadPortSequence": "1",
+					"dischargePort": "PRSJU",
+					"dischargePortSequence": "1",
+					"finalDestinationAbbreviation": "PRSJU",
+					"originVoyage": "CAR0003N",
+					"vesselAbbreviation": "ELC",
+					"vesselName": "EL COQUI",
+					"vesselLloydsCode": "9721970",
+					"vesselCountryCode": "US",
+					"vesselOwnerScac": "CWLQ",
+					"estimateSailDate": "2015-07-04",
+					"actualSailDate": "2015-07-04",
+					"estimatedArrivalDate": "2017-11-11",
+					"actualArrivalDate": "2015-07-04"
+				}
+			}
+		],
+		"equipments": [
+			{
+				"equipment": {
+					"itemDetailSeq": "0100",
+					"prefix": "CMCU",
+					"number": "4952545",
+					"category": "TANK",
+					"length": "40",
+					"type": "42G0",
+					"equipmentTypeCode": "CN",
+					"fleetCategory": "CHASSIS",
+					"estatusCode": "19860203",
+					"cargoWeight": "24574.10",
+					"weightType": "G",
+					"weightUnitofmeasure": "KGS",
+					"tareWeight": "4500",
+					"tareWeightUnitofmeasure": "KGS",
+					"cargoUnitQty": "2125",
+					"eqpCargoUom": "PC",
+					"cargoCube": "1154.450",
+					"cubeUnitofmeasure": "M3",
+					"ownerScac": "CLAM",
+					"isLoaded": true,
+					"seals": [
+						{
+							"sealNbr": "R1471714"
+						}
+					],
+					"temperatures": [
+						{
+							"temperature1": {
+								"type": "R",
+								"temp": "10",
+								"uom": "F"
+							},
+							"temperature2": {
+								"type": "S",
+								"temp": "10",
+								"uom": "F"
+							},
+							"temperature3": {
+								"type": "A",
+								"temp": "10",
+								"uom": "F"
+							}
+						}
+					],
+					"vgmWeightLbs": "51595",
+					"vgmWeightKg": "19346",
+					"vgmScaleWeightLbs": "51595",
+					"vgmScaleWeightKg": "19346",
+					"vgmMetricInd": "L",
+					"vgmInd": "C",
+					"vgmDate": "2020-07-28",
+					"vgmTime": "10:03:01",
+					"vgmAuthPerson": "CESAR BARRA",
+					"vgmRespParty": "CROWLEY LINER SERVICES "
+				}
+			}
+		],
+		"charges": [
+			{
+				"charge": {
+					"itemSequence": "0100",
+					"code": "CMC",
+					"uniqueNumber": "0001",
+					"chgBlLevelChargeInd": "Y",
+					"chgXcldChrgInd": "Y",
+					"text": "SECURITY/NON US",
+					"partycd": "3RD",
+					"partyUniqueNumber": "0001",
+					"rate": "207.5100",
+					"rateBasis": "EAC",
+					"rateBasisFactor": "40",
+					"quantity": "1.16",
+					"baseQtyType": "EACH",
+					"foreignExchangeRate": "1",
+					"prepayCollectCode": "PP",
+					"currencyCode": "RLS",
+					"chgCrncyOpt": "FO",
+					"totalChrgAmt": "240.7116",
+					"paymentLocation": {
+						"locationName": "CROWLEY MARITIME",
+						"locationCode": "USJAX",
+						"city": "JACKSONVILLE",
+						"state": "FL",
+						"country": "US"
+					}
+				}
+			}
+		]
+	}
+}

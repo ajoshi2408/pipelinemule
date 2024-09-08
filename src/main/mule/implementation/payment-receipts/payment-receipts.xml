@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="mf-payment-receipts"
+		doc:id="bec449be-f4fc-4b56-9825-6ca9d1e0b991">
+		<ee:transform doc:name="DW SET FV paymentInput"
+			doc:id="419c070b-31f9-4fb9-84bf-7fdcc9057fd6">
+			<ee:variables>
+				<ee:set-variable resource="dwl/payment-receipts/v-paymentInput.dwl" variableName="paymentInput" />
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check If paymentInput isEmpty"
+			doc:id="85d88a19-57ed-4e1d-b32e-bd5fb60f101d">
+			<when expression="#[!isEmpty(vars.paymentInput)]">
+				<ee:transform
+					doc:name="DW SET Payload SF-GET-PreReqData"
+					doc:id="7bb06493-a88f-48c2-8202-cdcf750050f9">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/payment-receipts/p-sf-queries.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to cf-common-salesforce-composite"
+					doc:id="b321ca9c-1b59-442c-b4f7-f70920d622f5"
+					name="cf-common-salesforce-composite" target="getSFCompResponse" />
+				<ee:transform
+					doc:name="DW SET FV insertPayload sfFailures sfSuccess"
+					doc:id="7686157a-9cec-4b05-bbbf-44121c94f2e9">
+					<ee:variables>
+						<ee:set-variable
+							resource="dwl/payment-receipts/v-insert-payload.dwl"
+							variableName="insertPayload" />
+						<ee:set-variable variableName="sfSuccess"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+						<ee:set-variable variableName="sfFailures"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to sf-upsert-payment-receipts-records"
+					doc:id="cef6f5ba-1330-451c-9918-ee3500ad2f27"
+					name="sf-upsert-payment-receipts-records" />
+				<flow-ref
+					doc:name="Refer to sf-check-failed-payment-receipt-records"
+					doc:id="cddd8a7d-b8cf-46c7-86fe-ce72573a6fb6"
+					name="sf-check-failed-payment-receipt-records" />
+				<async doc:name="Async"
+					doc:id="25994bfe-fe93-474d-a82b-c8e32694a92e">
+					<flow-ref
+						doc:name="Refer to sf-case-create-payment-receipts"
+						doc:id="c3c27e51-f237-4c63-bec3-2514ee600a47"
+						name="sf-case-create-payment-receipts" />
+				</async>
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO No Payment Receipts to Process"
+					doc:id="d4c986e6-e808-4fdf-add8-b29b663ee413"
+					message="No Payment Receipts to Process" />
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="DW SET Response Payload"
+			doc:id="55783967-201f-4950-8722-cfeb89b4eb30">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "success"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler
+			ref="payment-receipts-common-error-handler" />
+	</flow>
+	<sub-flow name="sf-upsert-payment-receipts-records"
+		doc:id="530c62b5-65be-4f13-a2f8-39d1f5d4b74f">
+		<set-variable
+			value="#[vars.insertPayload filter $.toProcess == true map { ($ - 'toProcess' )}]"
+			doc:name="SET FV Records to Process"
+			doc:id="1ecf5810-81fe-4eed-bbee-44bc4e4c670e"
+			variableName="recordsToProcess" />
+		<foreach doc:name="For Each"
+			doc:id="39122fd6-7eae-4e15-b7c3-765223e4d122"
+			batchSize="${paymentReceipts.upsertSize}"
+			collection="#[vars.recordsToProcess]">
+			<set-variable value="#[payload]"
+				doc:name="SET FV Records to Process"
+				doc:id="3281f53a-f817-4f23-b313-8de4b12757ac"
+				variableName="currentRecords" />
+			<logger level="DEBUG" doc:name="LOG DEBUG Upsert Request"
+				doc:id="61d6ac04-9c17-4f50-bb48-4bc3d89d62fa"
+				category="com.crowley.paymentReceipts"
+				message='#[{(correlationId ++ "-Payment Receipt") : payload}]' />
+			<salesforce:upsert
+				doc:name="Upsert Payment Receipts "
+				doc:id="5777ef86-a4e1-4b2b-915b-06b547c9bf12"
+				config-ref="common_salesforce-configuration"
+				objectType="Payment_Receipt__c"
+				externalIdFieldName="Invoice_Number__c">
+			</salesforce:upsert>
+			<logger level="DEBUG" doc:name="LOG DEBUG Upsert Response"
+				doc:id="b29d6cc6-f37f-4ca3-b661-b6ca8f601c14"
+				message='#[%dw 2.0&#10;output application/json&#10;---&#10;{(correlationId ++ "-Payment Receipt") : payload}]'
+				category="com.crowley.paymentReceipts" />
+			<ee:transform doc:name="DW SET FV sfFailures sfSuccess"
+				doc:id="10425160-df8e-4410-a2d2-6b22ff179c38">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable
+						resource="dwl/payment-receipts/v-sf-success.dwl"
+						variableName="sfSuccess" />
+					<ee:set-variable
+						resource="dwl/payment-receipts/v-sf-failures.dwl"
+						variableName="sfFailures" />
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="sf-check-failed-payment-receipt-records"
+		doc:id="e32814e4-d689-4992-891b-11eb34acd737">
+		<choice doc:name="Check IF PR Creation has errors"
+			doc:id="03989523-7a33-4ada-ba86-afc00e72a9f8">
+			<when expression="#[!isEmpty(flatten(vars.sfFailures))]">
+				<logger level="DEBUG" doc:name="LOG DEBUG Failed Records"
+					doc:id="c2ab8cfc-6437-4fee-acaf-c23d7a4199bb"
+					message="#[vars.sfFailures]" category="com.crowley.paymentReceipts" />
+				<ee:transform
+					doc:name="DW SET Payload Notification Service"
+					doc:id="a67995e6-a653-42a9-bd16-d637316fe1ec">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/payment-receipts/p-notification-service-fields.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="DEBUG"
+					doc:name="LOG DEBUG Notification Payload"
+					doc:id="83c824a7-d402-401d-94ed-db504e13c8d9" message="#[payload]"
+					category="com.crowley.paymentReceipts" />
+				<flow-ref
+					doc:name="Refer to cf-invoke-notification-service"
+					doc:id="f1013909-8e2b-47bf-85c5-2a3f81471fc6"
+					name="cf-invoke-notification-service" target="notificationResponse" />
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Payment Receipt UPSERT Success"
+					doc:id="ab93f81e-a4b5-40a6-a67f-a055c3c31365"
+					message="PAYMENT RECEIPT UPSERT SUCCESS" />
+
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="sf-case-create-payment-receipts"
+		doc:id="b66998fe-c543-4821-9a29-f41ab6d1a5ee">
+		<ee:transform
+			doc:name="DW SET Payload Case Creation Fields"
+			doc:id="a2d66145-a6b3-4fdf-b6bc-686f0880b088">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/payment-receipts/p-case-creation-fields.dwl" />
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Check If Case Creation Required"
+			doc:id="e2880b7d-f22b-4bcc-8ef0-2ee34ee3b290">
+			<when expression="#[!isEmpty(payload)]">
+				<foreach doc:name="For Each"
+					doc:id="66843ff2-8028-4fbf-b892-1624215f1217"
+					batchSize="${paymentReceipts.caseCreationSize}">
+					<ee:transform doc:name="DW SET Payload messageEnrich"
+						doc:id="e2d52489-9f9b-40ef-9072-af166c7b63f9">
+						<ee:message>
+							<ee:set-payload
+								resource="dwl/payment-receipts/p-case-creation-fields-enrichment.dwl" />
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable
+								resource="dwl/payment-receipts/v-case-create-notification.dwl"
+								variableName="caseCreateNotification" />
+						</ee:variables>
+					</ee:transform>
+					<flow-ref doc:name="Refer to mf-case-creation"
+						doc:id="d2a52254-d963-41a0-9111-1ee39386855e"
+						name="mf-case-creation" target="caseCreationResponse" />
+					<choice doc:name="Check If Case Creation Success"
+						doc:id="4e5cea59-7dd5-4098-8a13-a53d9fbb81cf">
+						<when
+							expression='#[vars.caseCreationResponse.Message == "Success"]'>
+							<ee:transform
+								doc:name="DW SET Payload caseCreation success Notification"
+								doc:id="23d255d6-cf25-49f4-a52a-b416acdd93d0">
+								<ee:message>
+									<ee:set-payload
+										resource="dwl/payment-receipts/p-case-creation-success-notification.dwl" />
+								</ee:message>
+							</ee:transform>
+							<flow-ref
+								doc:name="Refer to cf-invoke-notification-service"
+								doc:id="8e823500-adf6-4180-ac98-b37e8642e644"
+								name="cf-invoke-notification-service" />
+						</when>
+						<otherwise>
+							<logger level="INFO"
+								doc:name="LOG INFO Case Creation Failure"
+								doc:id="7b9b31a0-ef9c-420a-91ae-2a8dac86f8bc"
+								message='#["Case creation failed for invoice number : " ++ vars.caseCreateNotification.invoiceNumber default ""]' />
+						</otherwise>
+					</choice>
+				</foreach>
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Case Creation Skipped"
+					doc:id="e7fe9bdb-4948-4fd0-bcc3-d0c94681939a"
+					message='#["Case creation skipped"]' />
+			</otherwise>
+		</choice>
+	</sub-flow>
+</mule>

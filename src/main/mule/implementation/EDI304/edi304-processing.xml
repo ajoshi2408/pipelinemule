@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="a73858fe-b834-4447-aca5-8d7944046e8f" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="mf-edi304-sf-processing" doc:id="7c2d4428-2d3e-4d7f-bf49-aa6822b07052" >
+		<logger level="INFO" doc:name="LOG INFO EDI304 Flow Start" doc:id="da8d2fcd-bf75-423e-9121-98e79844ba0a" message="[EDI304] EDI304 BOL processing flow starts for blNumber--#[payload.billoflading.blNumber]"/>
+		<ee:transform doc:name="DW VARIABLE SF API Fields" doc:id="385c015c-867c-44a7-b6fa-9badc4bf3354" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfFields" resource="dwl/EDI304/v-edi304-sfFields.dwl" />
+				<ee:set-variable variableName="blNumber" resource="dwl/EDI304/v-edi304-blNumber.dwl" />
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-edi304-bol-processing" doc:id="b811f259-68c5-4ee5-99bb-ef37eea071e1" name="sf-edi304-bol-processing"/>
+		<logger level="INFO" doc:name="LOG INFO EDI304 Flow End" doc:id="db919f0a-ae7f-41ba-a592-f32700f8985c" message="[EDI304] EDI304 BOL processing flow completed for blNumber--#[vars.blNumber]"/>
+	</flow>
+	<sub-flow name="sf-edi304-bol-processing" doc:id="068f4283-c058-4705-9ea3-8bfc2f689e7d" >
+		<logger level="INFO" doc:name="LOG INFO Create Composite Request" doc:id="7357600c-8a81-4f76-bd79-746fd6c09b72" message="[EDI304] Creating composite request for salesforce with blNumber--#[vars.blNumber]" />
+		<ee:transform doc:name="DW PAYLOAD BOL Composite Request" doc:id="7cbcbcb1-ea66-488f-9460-c1a36072eab1">
+			<ee:message>
+				<ee:set-payload resource="dwl/EDI304/p-edi304-composite-request.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG Call Salesforce" doc:id="7a81bfbc-e7ef-4793-b552-aeb7507f4ff4" message="[EDI304] Calling Salesforce to insert BOL data with blNumber--#[vars.blNumber] and payload--#[payload]" category="com.crowley.edi304"/>
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite-graph" doc:id="707e58a8-aeae-4575-adb7-4cd8029cf9d4" name="cf-common-salesforce-composite-graph" />
+		<ee:transform doc:name="DW PAYLOAD Composite Response" doc:id="566e1c45-e2bc-49f7-bb70-5b67d282a7ea" >
+			<ee:message >
+				<ee:set-payload resource="dwl/EDI304/p-edi304-composite-response.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG INFO Salesforce Response" doc:id="259d15fe-73a2-48cc-9991-9a3409b59de9" message="[EDI304] Salesforce response received for blNumber--#[vars.blNumber] is--#[payload]"/>
+	</sub-flow>
+</mule>

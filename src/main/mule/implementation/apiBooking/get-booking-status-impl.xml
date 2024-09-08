@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="sf-get-booking-status" doc:id="69802fbf-2a78-4b68-a0ff-5bbef22c9fbf" >
+		<logger level="INFO" doc:name="Log Booking Reference No. [INFO]" doc:id="d3283175-665f-4110-bece-b4e50dee4ec9" message="[API-Booking]::Connecting Salesforce to Fetch Booking Status with Booking Reference Number: #[vars.bookingRefNumber]"/>
+		<salesforce:query doc:name="Fetch Status, BookingNo from SF" doc:id="7cb1b461-72c5-487c-887d-fe0343605cb8" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id, Status__c,Booking_Number__c FROM Booking__c where Booking_Transaction_Reference_Number__c = ':referenceNo']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"referenceNo" : vars.bookingRefNumber
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<choice doc:name="Choice" doc:id="66e70e00-c139-4db6-9d01-d765a4a955c9" >
+			<when expression='#[!isEmpty(payload[0].Id)]'>
+				<logger level="DEBUG" doc:name="Log payload [DEBUG]" doc:id="7b4e6487-ccb6-48b5-985e-5af150f2e7ce" message="[API-Booking]::Payload based on Booking Reference Number : #[payload]" category="com.api.booking"/>
+				<ee:transform doc:name="Set Status Payload" doc:id="535359e4-f8f7-46a2-ade2-875b4a6d537c" >
+					<ee:message >
+						<ee:set-payload resource="dwl/get-booking-status/p-updated-payload.dwl" />
+					</ee:message>
+				</ee:transform>
+				<choice doc:name="Choice" doc:id="3e0633f5-5f80-4d89-a180-cc2a3a7d6aff" >
+					<when expression='#[payload.status == "Active"]'>
+						<set-variable value="#[payload]" doc:name="Set statusPayload" doc:id="72276cf3-ca62-4e42-9675-dc4ab64085da" variableName="statusPayload"/>
+						<flow-ref doc:name="Refer to sf-get-open-cases-from-bookingNum" doc:id="ddae5c28-5bb6-4fc9-a2dc-b2b193713503" name="sf-get-open-cases-from-bookingNum"/>
+						<ee:transform doc:name="Set Sub-Status" doc:id="b81a1722-de38-413a-a64f-c353f40d214d" >
+							<ee:message >
+								<ee:set-payload resource="dwl/get-booking-status/p-set-sub-status.dwl" />
+							</ee:message>
+						</ee:transform>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Log Booking not Active [INFO]" doc:id="c6c7bdd9-471c-4776-929f-8625c5f88a42" message="[API-Booking]::Booking is not Active"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Log Booking Not Found [INFO]" doc:id="4bbe4773-e4e2-410d-8f05-8af64598c861" message="[API-Booking]::Booking not found with Booking Reference Number: #[vars.bookingRefNumber]"/>
+				<ee:transform doc:name="Set Payload" doc:id="c71162b9-d897-423e-8bbe-0ef8fcdad5a5" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+'Booking not found']]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="sf-get-open-cases-from-bookingNum" doc:id="cbfc13e8-a0a9-4174-8130-654f576ef12a" >
+		<logger level="INFO" doc:name="Log Start [INFO]" doc:id="446dd6ab-7d61-4521-8411-603b44344c11" message="[API-Booking]::Fetch open cases for Booking Number: #[payload.bookingNumber]"/>
+		<salesforce:query doc:name="Fetch Id, CaseNumber, Status, Subject, Description, Booking__c" doc:id="f63a5f8d-8e18-4f44-a521-d3bae3da371e" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id, CaseNumber, Status, Subject, Description, Booking__c FROM Case where Status = 'Open' AND Booking__c = ':bookingNumber']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"bookingNumber" : payload.bookingNumber
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<choice doc:name="Choice" doc:id="0073ad11-befe-405c-b0f2-7ee499d67e6d" >
+			<when expression='#[!isEmpty(payload[0].Id)]'>
+				<logger level="INFO" doc:name="Log Found [INFO]" doc:id="8279fa64-021a-4852-a163-1a128cc4b197" message="[API-Booking]::Open Cases found against Booking Number: #[payload.Booking__c]"/>
+				<logger level="DEBUG" doc:name="Log payload [DEBUG]" doc:id="bf6c4f0a-caf7-4c99-9c19-61fe268c5996" message="[API-Booking]::Cases based on Booking Number : #[payload]" category="com.api.booking"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Log not found [INFO]" doc:id="14aa91da-414c-4e5f-b566-7820f3dc2991" message="[API-Booking]::No Open Cases found"/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Log Completed [INFO]" doc:id="c3ee5bb0-cf6f-4ea1-aabf-4570f39d2a75" message="[API-Booking]::Fetch open cases flow completed"/>
+	</sub-flow>
+</mule>

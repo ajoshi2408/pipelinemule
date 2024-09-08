@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="mf-consume-events-from-kafka" initialState="${cdm.initial.state}">
+        <kafka:message-listener doc:name="Customer Vendor Message Listener" doc:id="698b919b-e08e-4236-b43d-128e15e02911" config-ref="customerVendorKafkaConsumerConfig"/>
+		<logger level="INFO" doc:name="LOG INFO Listening to Event [START]" doc:id="2897ff57-627d-44cd-b4f6-78a0a29392b5" message="======== Listening to customer vendor kafka event  ========"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="bbd37139-f7d6-4575-92c4-cd1d5933761a" mimeType="application/json"/>
+
+        <logger level="DEBUG" doc:name="LOG DEBUG Payload From Kafka" doc:id="7df1b1a7-911a-4357-b11e-f0667941cc9b" message="Payload received : #[payload] " category="com.crowley.cdm.sf.sync"/>
+		<vm:publish doc:name="VM Publish Customer Info" doc:id="640bdfcd-cd9b-4fce-b68b-fe873a78419d" config-ref="common_vm-config" queueName="${vm.queueName.customerVendor}" timeout="${vm.timeout}"/>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+
+    
+</flow>
+	<flow name="mf-consume-events-from-vm">
+
+        <vm:listener doc:name="VM Listener Customer Info" doc:id="3f4e2a25-8ed7-4331-b55c-1ba6aa36ac9a" config-ref="common_vm-config" queueName="${vm.queueName.customerVendor}" timeout="${vm.timeout}"/>
+		<logger message="Payload from VM :: #[payload]" level="INFO" doc:name="LOG INFO Payload From VM"/>
+
+        <flow-ref name="pf-cdm-to-sf-sync-data" doc:name="Refer to pf-cdm-sf-sync-data" />
+		<error-handler ref="cdm-sf-sync-error-handler" />
+
+    
+</flow>
+	<flow name="pf-cdm-to-sf-sync-data">
+		<set-variable value="#[payload.customerVendorId]" doc:name="customerVendorId" doc:id="e75d5aaa-197c-4495-8a1a-cbac7cbdd89a" variableName="customerVendorId"/>
+		<until-successful maxRetries="${rest.retry}" millisBetweenRetries="${rest.millisecondretry}" doc:name="Until Successful">
+			<http:request config-ref="customer_vendor_http_request_configuration" path="/${customer-vendor-business-service-2.path}/{customerVendorId}" method="GET" doc:name="Retrieve Details from Customer-vendor-business-service-2">
+				<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"customerVendorId" : vars.customerVendorId
+}]]]></http:uri-params>
+            </http:request>
+
+        </until-successful>
+		<logger message='********Payload from CVBS-2 :: #[payload]********' level="DEBUG" doc:name="LOG DEBUG Payload" category="com.crowley.cdm.sf.sync"/>
+
+        <ee:transform doc:name="DW to Filter Cyclic Update" doc:id="46632b34-8833-4d49-b723-4d295db4fe56" >
+			<ee:message >
+				<ee:set-payload resource="dwl/cdm-sf-sync/p-filter-cyclic-update.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/cdm-sf-sync/v-recipient-email.dwl" variableName="varRecipientEmail" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG Filtered Payload" doc:id="caedeaf1-a82d-4002-a850-185ee3654600" message="Filtered Payload : #[payload]" category="com.crowley.cdm.sf.sync"/>
+		<ee:transform doc:name="JSON to Object">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0 output application/java 
+--- 
+payload as Object { class: 'java.util.Map'}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+		<choice doc:name="Check For Update">
+            <when expression="#[not isEmpty(payload.parties)]">
+            <parallel-foreach doc:name="Parallel For Each" doc:id="f4689fe3-67aa-43b8-8157-5f2369f8a732" collection="#[payload.parties]">
+					<choice doc:name="Check For CVIF Number &amp; OrgAttribute10">
+                        <when expression="#[(not isEmpty(payload.CVIFNumber)) and (not isEmpty(payload.OrgAttribute10))]">
+                            <ee:transform doc:name="DW To Set Account, Business Location , Contact" doc:id="4a12da84-893f-42ba-9f21-8b99f7543fda">
+								<ee:message>
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable resource="dwl/cdm-sf-sync/v-account.dwl" variableName="accountVar" />
+									<ee:set-variable resource="dwl/cdm-sf-sync/v-contact.dwl" variableName="contactVar" />
+									<ee:set-variable resource="dwl/cdm-sf-sync/v-business-locations.dwl" variableName="businessLocationVar" />
+								</ee:variables>
+							</ee:transform>
+							<logger message="After Account :: #[vars.accountVar] ============== After BusinessLocation :: #[vars.businessLocationVar] =============== After contact :: #[vars.contactVar]" level="INFO" doc:name="LOG INFO Account, Business Location and Contact Details" />
+							<flow-ref name="pf-sync-accounts" doc:name="Refer to pf-sync-accounts" />
+							<logger level="INFO" doc:name="LOG INFO Account Update Result" doc:id="b520bfac-c202-4068-8dad-153b71b12dd4" message="Account was successfully inserted/updated : #[vars.varSuccessResponse]"/>
+							<choice doc:name="Check Account SF Response">
+                                <when expression='#[vars.varSuccessResponse]'>
+                                    <flow-ref name="pf-sync-business-locations" doc:name="Refer to pf-sync-business-locations" />
+                                    <flow-ref name="pf-sync-contacts" doc:name="Refer to pf-sync-contacts" />
+                                    <logger message=" ======== Successfully data inserted/updated into salesforce for account #[vars.accountVar[0].Name] ========" level="INFO" doc:name="LOG INFO Data Updated [Ended]" />
+                                </when>
+                                <otherwise>
+                                    <logger message="********Getting Error in Account Object for Account :  #[vars.accountVar[0].Name]********" level="INFO" doc:name="LOG INFO Message" />
+                                </otherwise>
+                            </choice>
+                        
+</when>
+                        <otherwise>
+							<ee:transform doc:name="DW To Set Error Message" doc:id="9bde934a-88c0-4c6e-ae51-76d992477cc9">
+								<ee:message>
+									<ee:set-payload resource="dwl/cdm-sf-sync/p-account-missing-cvif-number-name-error.dwl" />
+								</ee:message>
+							</ee:transform>
+							<logger message="CVIF Name or CVIF Number is missing." level="INFO" doc:name="LOG INFO CVIF Name Or CVIF Number Is Missing" />
+							<flow-ref name="cf-invoke-notification-service" doc:name="Refer to notification-system-service" doc:id="29038c4e-baa6-4014-a07b-ee8c575e16b6"/>
+                        
+</otherwise>
+                    </choice>
+                </parallel-foreach>
+            
+</when>
+			<otherwise>
+                <logger level="INFO" doc:name="LOG INFO No Update From CDM" message="********No Update Received From CDM********" />
+            </otherwise>
+        </choice>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+
+    
+</flow>
+
+	<flow name="pf-sync-accounts" >
+	
+	        <set-payload value="#[vars.accountVar]" doc:name="Set Account Payload" />
+	
+	        <ee:transform doc:name="JSON to Object">
+	            <ee:message>
+	                <ee:set-payload><![CDATA[%dw 2.0 output application/java 
+--- 
+payload]]></ee:set-payload>
+	            </ee:message>
+	        </ee:transform>
+		<choice doc:name="Check For Mandatory Fields" doc:id="232cfcc1-c8fd-436d-a210-9b5d1d715453">
+			<when expression="#[(not isEmpty(payload[0].Name)) and (not isEmpty(payload[0].CDM_Org_Id__c)) and (not isEmpty(payload[0].Type))]">
+				<ee:transform doc:name="DW To Set SF Components and Store Payload" doc:id="52a84a62-5a37-4496-9847-75f937bca437">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varAccountPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+						<ee:set-variable variableName="varSFUpsert" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	externalId: if(not isEmpty(payload[0].Id)) "Id" else "CDM_Org_Id__c",
+	objectType: "Account",
+	flowName: "Upsert-Account",
+	salesforcePayload: payload
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="LOG DEBUG Payload" doc:id="d07aa1d7-9d14-4b14-8a6b-55639f3b896e" message="Performing update on data : #[vars.varSFUpsert.salesforcePayload]" category="com.crowley.cdm.sf.sync"/>
+				<flow-ref doc:name="Refer to cf-cdm-sync-salesforce-upsert" doc:id="6f4b5f13-c83e-48bb-8228-acbaf8be400c" name="cf-cdm-sync-salesforce-upsert"/>
+				<logger level="INFO" doc:name="LOG INFO SF Response" doc:id="51d2b4cd-c0c4-49d9-8de0-8b6dcd7bc6d3" message='Response received after account upsert : #[write(payload, "application/json")]' />
+				<ee:transform doc:name="DW to Set AccountId and Response" doc:id="4aca9efc-5dc4-4ff6-b54d-765e9d5406b9">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varSuccessResponse" ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.successful) and (payload.items[0].successful) and (isEmpty(payload.items[0].exception))]]></ee:set-variable>
+						<ee:set-variable variableName="varAccountId" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<choice doc:name="Check SF Response" doc:id="3e8c31f3-af3b-43f8-8ba4-f4e5708613ff" >
+					<when expression="#[vars.varSuccessResponse]">
+						<logger level="INFO" doc:name="LOG INFO Success" doc:id="33a78442-2349-4ac1-947e-7066d6f1906d" message="********#[vars.varAccountPayload[0].Name]  Account Successfully Created/Updated********"/>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="LOG INFO Message" doc:id="f99cf46f-5b38-434c-9fbb-2ce1319abc9d" message="********Getting error from Account object :: #[payload.items[0].exception.message]********"/>
+						<ee:transform doc:name="DW to Set Error Message" doc:id="2a992661-1b68-4a1b-be68-94075aacd87e" >
+							<ee:message >
+								<ee:set-payload resource="dwl/cdm-sf-sync/p-account-error-response.dwl" />
+							</ee:message>
+						</ee:transform>
+						<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="04d6bc74-4154-44df-b330-64829429aa99" name="cf-invoke-notification-service"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="LOG INFO Message" doc:id="9bac7af5-748f-4e68-b334-90ed0553197b" message="**********Mandatory fields are missing********* Name : #[payload[0].Name] , CDM Org Id: #[payload[0].CDM_Org_Id__c] , Type : #[payload[0].Type]" />
+				<ee:transform doc:name="DW to Set Error Message" doc:id="fb3c167b-cecc-4c9b-8511-f0e31b54325c" >
+					<ee:message >
+						<ee:set-payload resource="dwl/cdm-sf-sync/p-account-missing-fields-error.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="1b67a34d-dadd-4c29-ba80-747c7f83b937" name="cf-invoke-notification-service"/>
+			</otherwise>
+		</choice>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+	
+	    
+</flow>
+	<flow name="pf-sync-business-locations">
+
+        <set-payload value="#[vars.businessLocationVar]" doc:name="Set Payload Business Locations" />
+
+        <choice doc:name="Check Business Locations Empty" doc:id="ddc6dea5-975c-4916-9f19-2e42b60bc2ab" >
+			<when expression="#[not isEmpty(payload)]">
+				<ee:transform doc:name="DW to Check Mandatory Fields" doc:id="ad0176e7-fccf-475b-afe9-fab860f9a9db">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+						<ee:set-variable variableName="varFinalLocations" ><![CDATA[%dw 2.0
+output application/json
+var filterLoc=payload filter ((item, index) -> 
+(not isEmpty(item.CVIF_Location_Id__c)) and ((not isEmpty(item.City__c)) or item.Country_c =="SG") and (not isEmpty(item.CVIF_Location_Number__c)) and (not isEmpty(item.LocationCode__c)) and (not isEmpty(item.Country__c)) and (not isEmpty(item.Name)) and (not isEmpty(item.CDM_Org_Id__c))
+)
+---
+{
+	filteredBusinessLocations: filterLoc,
+	failedBusinessLocations: payload -- filterLoc
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<choice doc:name="Choice" doc:id="a06b79fd-1223-4d59-8a97-f20ce05a4374">
+			<when expression="#[(not isEmpty(vars.varFinalLocations.filteredBusinessLocations)) and isEmpty(vars.varFinalLocations.failedBusinessLocations)]">
+				<flow-ref doc:name="Refer to pf-salesforce-upsert-business-locations" doc:id="e6153551-d530-4b4c-8c1c-1ae64b1db04c" name="pf-salesforce-upsert-business-locations" />
+			</when>
+			<when expression="#[(not isEmpty(vars.varFinalLocations.filteredBusinessLocations)) and (not isEmpty(vars.varFinalLocations.failedBusinessLocations))]">
+						<try doc:name="Try" doc:id="a2c9f388-96e4-421f-b830-f9bca75df976" >
+							<foreach doc:name="For Each" doc:id="4a23a22d-2405-4670-babe-f094a0393043" collection="#[vars.varFinalLocations.failedBusinessLocations]">
+								<validation:is-null doc:name="Is null" doc:id="6a7e03ba-a673-4f74-9bf7-15874f95c8dc" value="#[payload]" />
+						</foreach>
+							<error-handler >
+								<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="bff25c3a-257d-4a08-8e99-501343488eda" >
+									<flow-ref doc:name="Refer to business-locations-mandatory-fields-missing" doc:id="939f01aa-9ae9-47fa-b656-07ca4c8cf62b" name="business-locations-mandatory-fields-missing"/>
+								</on-error-continue>
+							</error-handler>
+						</try>
+						<flow-ref doc:name="Refer to pf-salesforce-upsert-business-locations" doc:id="31dd517f-a596-43cc-93db-e30bad48f3bc" name="pf-salesforce-upsert-business-locations" />
+			</when>
+					<otherwise>
+						<try doc:name="Try" doc:id="577fc07c-f6fc-460c-a3bd-3e045491b199" >
+							<foreach doc:name="For Each" doc:id="cbc5fcfd-fad8-426f-a362-5301a9b99c97" collection="#[vars.varFinalLocations.failedBusinessLocations]">
+							<validation:is-null doc:name="Is null" doc:id="1acb6c6b-9d75-41a6-a792-cebbca1700f2" config-ref="Validation_Configuration" value="#[payload]" />
+						</foreach>
+							<error-handler >
+								<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e8d6c90e-1c09-4292-a8ac-e9ff08ad373f" >
+									<flow-ref doc:name="Refer to business-locations-mandatory-fields-missing" doc:id="3f7e9d00-d3c0-4af9-94bb-5ef5ed5dbfeb" name="business-locations-mandatory-fields-missing"/>
+								</on-error-continue>
+							</error-handler>
+						</try>
+			</otherwise>
+		</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG INFO No Business Locations Received" doc:id="7b7d661b-b240-493d-b9c9-e20c0a176e18" message="********No Business Locations Received From CDM*******" />
+			</otherwise>
+		</choice>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+
+    
+</flow>
+	<flow name="pf-salesforce-upsert-business-locations" doc:id="f0553951-5d09-4d82-94c7-cc3a3019e365" >
+		<ee:transform doc:name="DW to Store Payload" doc:id="316abac5-ab88-4de7-b6ad-f4af1b7cde23" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varBusinessLocPayload" ><![CDATA[%dw 2.0
+output application/json
+var addAccount = {
+    "Account__c": vars.varAccountId default ""
+}
+var removeField = {
+	"LocationAttribute6": vars.varFinalLocations.filteredBusinessLocations.LocationAttribute6 default ""
+}
+---
+vars.varFinalLocations.filteredBusinessLocations map ((item, index) -> (item - removeField.LocationAttribute6) ++ addAccount)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="DW to Set Upsert Component" doc:id="6f80d3c1-752c-4345-843f-eb0496e4eda3">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+				<ee:set-variable variableName="varSFUpsert" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	externalId: if(not isEmpty(payload[0].Id)) "Id" else "CDM_Location_Id__c",
+	objectType: "Address__c",
+	flowName: "Upsert-Business-Locations",
+	salesforcePayload: vars.varBusinessLocPayload
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG Payload" doc:id="ff5468e2-8405-444c-85b9-b72c04edf0ec" message="Performing update on data : #[vars.varSFUpsert.salesforcePayload]" category="com.crowley.cdm.sf.sync"/>
+		<flow-ref doc:name="Refer to cf-cdm-sync-salesforce-upsert" doc:id="0dac1f64-5921-4f9a-9b6e-7b2ebcf487b9" name="cf-cdm-sync-salesforce-upsert"/>
+		<logger level="INFO" doc:name="LOG INFO SF Response" doc:id="56ad320b-2bcd-48e3-9fd9-fcb2a8217a21" message='Response received after business locations upsert : #[write(payload, "application/json")]' />
+		<ee:transform doc:name="DW to Filter Failed Locations" doc:id="efa685ed-6cd4-44bf-82b0-b4cc225d0d8a" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varFailedLocations" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map ((item, index) -> 
+if ((not item.successful) or (not isEmpty(item.message)) or (not isEmpty(item.exception)))  vars.varBusinessLocPayload[index] ++ 
+{
+    "message": item.exception.message  default "",
+    "statusCode": item.statusCode default ""
+}
+else ""
+)filter (() -> not isEmpty($))]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG INFO Count of Failed Locations" doc:id="f72f2c30-f4e8-4da7-a8bd-e1de98e4e131" message="Total Business Locations received : #[sizeOf(vars.varBusinessLocPayload)] and failed to upsert Business Locations : #[sizeOf(vars.varFailedLocations)]"/>
+		<choice doc:name="Check Success Response" doc:id="02e21f5b-0c03-4dc5-8f0d-d77c702fff0c" >
+			<when expression="#[isEmpty(vars.varFailedLocations)]">
+				<logger level="INFO" doc:name="LOG INFO Success" doc:id="b9d9fb6e-12fc-4d5a-a4f7-d0cc7c16975b" message="********Successfully Businesslocation Created/Updated********" />
+			</when>
+			<otherwise>
+				<foreach doc:name="For Each" doc:id="f56ecf70-36d1-4b08-8141-8013f170637c" collection="#[vars.varFailedLocations]">
+					<logger level="INFO" doc:name="LOG INFO Failed Business Location" doc:id="f86dcb79-1f05-4290-b30b-45d1f00b6d3c" message="********Getting error from Business Locations object :: #[payload.Name]********"/>
+					<ee:transform doc:name="DW to Set Error Message" doc:id="37db7603-b720-49a8-872e-a9ab2a5e9fd8" >
+						<ee:message >
+							<ee:set-payload resource="dwl/cdm-sf-sync/p-business-locations-error-response.dwl" />
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="565ebb68-059e-4906-9720-0f36b104146f" name="cf-invoke-notification-service"/>
+				</foreach>
+			</otherwise>
+		</choice>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+	</flow>
+	<flow name="pf-sync-contacts">
+
+        <set-payload value="#[vars.contactVar]" doc:name="Set Payload Contact" />
+        <choice doc:name="Check Contacts Exists" doc:id="9420801e-765f-45b5-9053-50cf3d3809a2" >
+			<when expression="#[not isEmpty(payload)]">
+				<foreach doc:name="For Each" doc:id="66a2f348-f513-4d65-9f6e-4099ceeee290" >
+					<choice doc:name="Check If Location Id is Empty" doc:id="e67238cd-ef39-45e6-85f3-6b9746f5d907">
+						<when expression="#[isEmpty(payload.CDM_Location_Id__c)]">
+					<logger level="INFO" doc:name="LOG INFO Location Id Missing" doc:id="72737662-b9c9-4f15-988a-cc257455ee55" message="**********CDM_Location_Id is missing*********" />
+					<ee:transform doc:name="DW to Set Error Message" doc:id="9d206a2b-df57-4909-a603-d1ac09707d95">
+						<ee:message>
+									<ee:set-payload resource="dwl/cdm-sf-sync/p-contact-missing-location-id.dwl" />
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="45693e3e-deab-4593-9ad7-4d76b01d451a" name="cf-invoke-notification-service" />
+				</when>
+				<otherwise>
+					<ee:transform doc:name="DW to Set Query" doc:id="038f3012-0b18-4d81-be2a-feb9740ee41e">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="varQuery"><![CDATA[%dw 2.0
+output application/java
+---
+"SELECT Id FROM Address__c WHERE CDM_Location_Id__c =" ++ "'" ++ payload.ContactAttribute1_Id ++ "'"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+							<flow-ref doc:name="Refer to cf-cdm-sync-salesforce-query" doc:id="eb3f72db-1ff2-47a8-9299-ad65214d5568" name="cf-cdm-sync-salesforce-query" target="varQueryResult" />
+					<validation:is-not-null doc:name="Is Business Location Id Not Null" doc:id="ed7fbba7-7db4-4270-9194-721ba1ab0cd2" config-ref="Validation_Configuration" value="#[vars.varQueryResult.Id]" message="Query returned NULL Id from Business Location" />
+					<flow-ref doc:name="Refer to pf-salesforce-upsert-contacts" doc:id="94b061a3-e0f6-4a64-b672-725f6cd899a2" name="pf-salesforce-upsert-contacts" />
+				</otherwise>
+			</choice>
+			</foreach>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="LOG INFO No Contacts Received" doc:id="eb3d4928-992d-456b-9613-4fc58ca36108" message="********No Contacts Received From CDM********"/>
+				</otherwise>
+			</choice>
+		
+		<error-handler ref="cdm-sf-sync-error-handler" />
+
+    
+</flow>
+	
+	<flow name="pf-salesforce-upsert-contacts" doc:id="9c5bb7dc-f05a-4a48-ab6b-346acf4e9ce9" >
+		<ee:transform doc:name="DW to Set varContactPayload" doc:id="3cf14a1e-6103-44a2-925a-5aa128476b4d" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varContactPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check If Mandatory Fields Exists" doc:id="648ed162-2f55-4ac5-ad08-45ae57bcac3c" >
+			<when expression="#[((not isEmpty(payload.LastName)) and ((not isEmpty(payload.Email)) or (not isEmpty(payload.Phone)) or (not isEmpty(payload.MobilePhone))))]">
+				<ee:transform doc:name="DW to Set Payload" doc:id="c25e4b59-6b28-4c9e-b2de-5c5aebb7a593">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var addAccount = {
+	"AccountId": vars.varAccountId default "",
+	"Address__c": vars.varQueryResult.Id[0] default ""
+}
+---
+[payload - "Action" - "ContactAttribute1_Id" ++ addAccount]]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<ee:transform doc:name="DW to Set Upsert Component" doc:id="1ce57c16-2d3f-4872-aa34-3cf871777a0c" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varSFUpsert" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	externalId: if(not isEmpty(payload.Id)) "Id" else "CDM_Contact_Id__c",
+	objectType: "Contact",
+	flowName: "Upsert-Contact",
+	salesforcePayload: payload
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="LOG DEBUG Payload" doc:id="1df827b6-3d35-4f47-92e5-83435c63818c" message="Performing update on data : #[vars.varSFUpsert.salesforcePayload]" category="com.crowley.cdm.sf.sync"/>
+				<flow-ref doc:name="Refer to cf-cdm-sync-salesforce-upsert" doc:id="6789b8c5-f4f8-4c17-b201-a5ed1faaf860" name="cf-cdm-sync-salesforce-upsert"/>
+				<logger level="INFO" doc:name="LOG INFO SF Response" doc:id="81f47e63-99f1-4d91-86bd-5ed5188c5f5b" message='Response received after contact upsert : #[write(payload, "application/json")]'/>
+				<choice doc:name="Check If Upsert Is Successful" doc:id="05e14e71-eb92-4aa8-8bbd-fc03876e7dd0" >
+					<when expression="#[(payload.successful) and (payload.items[0].successful) and (isEmpty(payload.items[0].exception))]">
+						<logger level="INFO" doc:name="LOG INFO" doc:id="7d85c8fd-2f1b-4516-a8bd-c449ad767a15" message='#[vars.varContactPayload.FirstName default "" ++ " " ++ vars.varContactPayload.LastName default ""] Contact inserted/updated successfully.'/>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="LOG INFO Message" doc:id="a35b3a7f-e18c-44da-af14-001dd334fdd2" message="**********Getting error from Contact object :: #[payload.items[0].exception.message]**********"/>
+						<ee:transform doc:name="DW to Set Error" doc:id="a13e749d-0d83-40f5-aa39-dfab8b762a8c" >
+							<ee:message >
+								<ee:set-payload resource="dwl/cdm-sf-sync/p-contact-error-response.dwl" />
+							</ee:message>
+						</ee:transform>
+						<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="d048ecab-5e3b-4679-8b6c-56e423eda0a1" name="cf-invoke-notification-service"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG INFO Missing Fields" doc:id="e19438ff-8357-4596-97df-f9d48c18dc3c" message="**********Mandatory fields are missing for contact*********LastName : #[payload.LastName] Email : #[payload.Email] Phone : #[payload.Phone] MobilePhone : #[payload.MobilePhone]"/>
+				<ee:transform doc:name="DW to Set Error Message" doc:id="2751fc41-57aa-4d8e-9e9c-6a13643de04c" >
+					<ee:message >
+						<ee:set-payload resource="dwl/cdm-sf-sync/p-contact-missing-fields-error.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="27e3a901-e552-4d00-843d-944e7e3dcbca" name="cf-invoke-notification-service"/>
+			</otherwise>
+		</choice>
+		<error-handler ref="cdm-sf-sync-error-handler" />
+	</flow>
+	
+	
+	
+</mule>

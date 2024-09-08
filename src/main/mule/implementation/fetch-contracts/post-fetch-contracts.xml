@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apachekafka="http://www.mulesoft.org/schema/mule/apachekafka" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/apachekafka http://www.mulesoft.org/schema/mule/apachekafka/current/mule-apachekafka.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<flow name="mf-vm-publish-fetch-contract">
+        <kafka:message-listener doc:name="Message listener" doc:id="bbe768ef-07a9-4e73-bd28-3b4b9b40fb96" config-ref="contractVendorKafkaConsumerConfig"/>
+		<logger message="Fetch Contracts: START #[flow.name] Flow Started" level="INFO" doc:name="LOG INFO Fetch Contract flow started" />
+		<set-variable value="Kafka notification consumed but unable to publish into VM queue" doc:name="SET Var errorMessage" doc:id="fca67572-f0fb-41a0-9ed2-8371649c4e01" variableName="errorMessage"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="56edff83-e2b6-4604-8764-9459eda5af62" mimeType="application/json"/>
+		<vm:publish doc:name="VM Publish - Contract" doc:id="60cbca1a-ca02-40f3-9a32-d849361ed352" config-ref="common_vm-config" sendCorrelationId="ALWAYS" queueName="${vm.queueName.fetchContract}" timeout="${vm.timeout}"/>
+		<error-handler ref="fetch-contracts-error-handler" />
+
+    
+</flow>
+
+    <flow name="mf-vm-listener-fetch-contracts">
+		
+        <vm:listener doc:name="VM Listener - contract" doc:id="64b50261-e8ec-4504-9f93-5f2257ee76c4" config-ref="common_vm-config" queueName="${vm.queueName.fetchContract}" timeout="${vm.timeout}"/>
+		<logger message="Fetch Contracts: #[flow.name] Flow Started. Request received at SFSS for fetch-contract from Kafka (key for s3 object) : #[payload]" level="INFO" doc:name="LOG INFO Contract Received payload from Kafka">
+        </logger>
+		<set-variable value="Failed to retrieve payload from Amazon S3" doc:name="SET Var errorMessage" doc:id="8f783caf-e2a8-45fe-8648-5f487268958a" variableName="errorMessage" />
+<flow-ref name="sf-get-object-from-s3" doc:name="Refer to sf-get-object-from-s3" doc:id="b66bc148-8c68-4b16-af05-2c291b224c8e"/>
+
+        		<logger message="Fetch Contracts: Payload recieved from AWS S3 #[payload]" level="DEBUG" category="com.crowley.sfiss.fetchContract" doc:name="LOG DEBUG Payload recieved from AWS S3">
+        </logger>
+        <set-variable value="Unable to send Contracts to C-Sight" doc:name="SET Var errorMessage" doc:id="d412080b-600f-4a2a-97bc-262a0410e715" variableName="errorMessage" />
+		<ee:transform doc:name="DW set contractStatus" doc:id="f0d31f63-3806-4dd6-8b09-9137ecdfafe8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+read(payload, "application/json")]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/fetch-contracts/v-contract-status.dwl" variableName="contractStatus" />
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="CHECK IF status is SIGNED">
+            <when expression="#[vars.contractStatus.statusDesc == 'SIGNED']">
+                <flow-ref name="pf-update-signed-fetch-contract" doc:name="Refer to pf-update-signed-fetch-contract" />
+            </when>
+            <otherwise>
+                <flow-ref name="pf-update-non-signed-fetch-contract" doc:name="Refer to pf-update-non-signed-fetch-contract" />
+            </otherwise>
+        </choice>
+		<error-handler ref="fetch-contracts-error-handler" />
+
+    
+</flow>
+
+    <flow name="pf-update-signed-fetch-contract">
+        <logger message="Fetch Contract: #[flow.name]  started for SIGNED ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]" level="INFO" doc:name="LOG INFO pf-update-signed-fetch-contract started" />
+		<ee:transform doc:name="DW SET errorMessage, Query var" doc:id="ff336635-90c6-4711-8b00-a71852a1b2b1" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="errorMessage" ><![CDATA[%dw 2.0
+output application/java
+---
+"Unable to send signed Contract to C-Sight.Failed to get Lookup Data from fetchContract"]]></ee:set-variable>
+				<ee:set-variable variableName="varQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+p('fetchContract.contract.query') ++ "'" ++ (vars.contractStatus.contractNum) ++ (vars.contractStatus.amendmentNum) ++ "'"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+		<flow-ref doc:name="Refer to cf-common-salesforce-query (Get Contract)" doc:id="dbf5beb8-6195-405b-8500-2a3f735b8e0a" name="cf-common-salesforce-query" target="queryResponse" />
+		<ee:transform doc:name="DW SET FV sfContractId,validRequest" doc:id="e959baed-dac7-418e-a305-5eda5299d150" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="sfContractId" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.queryResponse[0].Id]]></ee:set-variable>
+				<ee:set-variable variableName="validRequest" ><![CDATA[%dw 2.0
+output application/java
+---
+if (isEmpty(vars.queryResponse)) true
+else 
+   if ( (payload.Contracts[0].ContractNum == vars.queryResponse[0].Softship_Contract_Number__c) and (payload.Contracts[0].AmendmentNum == vars.queryResponse[0].Amendment_Number__c) and (payload.Contracts[0].OwnerID != vars.queryResponse[0].Account.CVIF__c) and (vars.queryResponse[0].StatusCode == "Activated") ) false 
+   else true ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="CHECK IF valid request ?" doc:id="c276ab0c-4569-4e44-a851-d2f6c94b5c36" >
+			<when expression="#[vars.validRequest]" >
+				<flow-ref doc:name="Refer to sf-update-signed-fetch-contract" doc:id="e22c3e34-5b44-47ae-87c0-e18c40d094c1" name="sf-update-signed-fetch-contract" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG INFO Activated Contract" doc:id="b629fe7c-5be0-4aae-91f2-49f04087ed34" message="#[&quot;Fetch Contract : An activated contract's account can't be changed for ContractNo: $(vars.contractStatus.contractNum) , AmendmentNo: $(vars.contractStatus.amendmentNum)&quot;]" />
+				<set-variable value="An activated contract's account can't be changed" doc:name="SET Var errorMessage" doc:id="0afa0a46-e1e2-4600-8d0d-ca3e3ea1680c" variableName="errorMessage" />
+				<ee:transform doc:name="DW SET Case Request" doc:id="06ce9fbf-6786-4d92-a255-f0e31708d8d3" >
+					<ee:message >
+						<ee:set-payload resource="dwl/fetch-contracts/p-signed-error-case-data.dwl" />
+					</ee:message>
+				</ee:transform>
+				<async doc:name="Async" doc:id="73ebcb4c-343d-460e-bbd2-565b8c44bcbd" >
+					<flow-ref doc:name="Refer to mf-case-creation" doc:id="778fc058-b892-4f75-9f62-cf87a13bbc4e" name="mf-case-creation" />
+				</async>
+				<ee:transform doc:name="DW SET Error Message" doc:id="4c5f502a-038f-42bd-b78f-878a4f2e463f" >
+					<ee:message >
+						<ee:set-payload resource="dwl/fetch-contracts/p-error-notification-data.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="cf-invoke-notification-service" doc:id="9ebd72d7-8d12-46ba-a1e5-21ab0db36a5b" name="cf-invoke-notification-service" />
+			</otherwise>
+		</choice>
+		<error-handler ref="fetch-contracts-error-handler" />
+
+    
+</flow>
+	<sub-flow name="sf-update-signed-fetch-contract" doc:id="1fac6670-c868-4239-a476-c3aaf34c80b1" >
+		<flow-ref doc:name="Refer to sf-get-account-location-lookup-data" doc:id="aba94e9e-89b3-4bef-9a27-1dff1a9bf8c5" name="sf-get-account-location-lookup-data" target="sfLookupResponse"/>
+
+        <flow-ref name="sf-get-stopIds" target="locationStopIdsResponse" doc:name="Refer to sf-get-stopIds"/>
+		<ee:transform doc:name="DW Payload map LookupData" doc:id="5144a1df-c507-47ff-8a67-6219aaf28c58" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/fetch-contracts/v-signed-contract-sf-lookup-data.dwl" variableName="sfLookup" />
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="DW Payload map input to SF" doc:id="b891cb9d-cf46-414f-95c2-548839f41c87">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable resource="dwl/fetch-contracts/v-signed-contract-sf-input.dwl" variableName="sfInput" />
+				<ee:set-variable variableName="nonSfAffiliates" ><![CDATA[%dw 2.0
+output application/java
+var inputAffiliates = (payload.Contracts[0].Affiliates.AffiliateID default []) << (payload.Contracts[0].OwnerID)
+var sfAffiliates = keysOf (vars.sfLookup.namesByaffiliates filterObject ((value, key, index) -> not isEmpty(value))) default []
+---
+inputAffiliates -- sfAffiliates]]></ee:set-variable>
+				<ee:set-variable variableName="errorMessage" ><![CDATA[%dw 2.0
+output application/java
+---
+"Unable to create/update contract in SF"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG SF Input" doc:id="d406be8e-9eba-47b0-bbd4-dd08d9e58d94" message="Fetch Contracts: SFInput Var for  ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum] : #[vars.sfInput]" category="com.crowley.sfiss.fetchContract" />
+		<validation:is-empty-collection doc:name="All Accounts Exist in SF ?" doc:id="ba14d7d5-7868-4c1a-9226-6549fb23b083" config-ref="Validation_Configuration" values="#[vars.nonSfAffiliates]" message="#[&quot;Following Account Ids don't exist in SF : &quot; ++ (vars.nonSfAffiliates joinBy &quot;,&quot; default &quot;NA&quot;)]"/>
+		<set-variable value="Unable to delete OptionalService/LineItems/Stops from Contract in SF" doc:name="SET Var errorMessage" doc:id="7cf60ee7-0e14-4202-8589-4d938d7b53e1" variableName="errorMessage" />
+		<choice doc:name="CHECK IF sfContractId var is not null">
+            <when expression="#[vars.sfContractId != null]">
+                <flow-ref name="sf-delete-optionalExceptions-linItems-stops" target="deleteResult" doc:name="Refer to sf-delete-optionalExceptions-linItems-stops" doc:id="b1826b4c-5911-4c06-85fb-d663246b91bc"/>
+            </when>
+            <otherwise>
+                <logger message='#["Fetch Contract : New Contract for ContractNo: $(vars.contractStatus.contractNum) , AmendmentNo: $(vars.contractStatus.amendmentNum) is new, hence skip delete of lineItems,optionalExceptionServices,stops"]' level="INFO" doc:name="LOG INFO New Contract/Amendement Number " />
+            </otherwise>
+        </choice>
+		<ee:transform doc:name="DW SET Contract, Account, Optional Service, LineItems, Stop Request" doc:id="573e19a4-6dbc-49bb-b890-0b89c17b36c9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java  
+---
+{
+	objectType: "Contract",
+	externalId: "ContractNumAmendmentNumIdentifier__c",
+	salesforcePayload: vars.sfInput.Contracts_Data.Contract
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contractAccountRequest" ><![CDATA[%dw 2.0
+output application/java  
+---
+{
+	objectType: "Contract_Account__c",
+	records: vars.sfInput.Contracts_Data[0].Contract_Accounts__r
+}]]></ee:set-variable>
+				<ee:set-variable variableName="lineItemRequest" ><![CDATA[%dw 2.0
+output application/java  
+---
+{
+	objectType: "Contract_Line_Item__c",
+	records: vars.sfInput.Contracts_Data[0].Contract_Line_Items__r
+}]]></ee:set-variable>
+				<ee:set-variable variableName="optionalServiceRequest" ><![CDATA[%dw 2.0
+output application/java  
+---
+{
+	objectType: "OptionalServiceException__c",
+	records: vars.sfInput.Contracts_Data[0].OptionalServiceExceptions__r
+}]]></ee:set-variable>
+				<ee:set-variable variableName="stopRequest" ><![CDATA[%dw 2.0
+output application/java  
+---
+{
+	objectType: "Stop__c",
+	records: vars.sfInput.Contracts_Data[0].Stop__r
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorMessage" ><![CDATA[%dw 2.0
+output application/java
+---
+"Unable to Update Contract Data in C-Sight"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger message="Fetch Contract: Contract Request for ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]: #[vars.varSFUpsert] , Contract Account Request : #[vars.contractAccountRequest], Optional Services : #[vars.optionalServiceRequest], LineItems Request : #[vars.lineItemRequest], Stops : #[vars.stopRequest]" level="DEBUG" doc:name="LOG DEBUG Contract Request" category="com.crowley.sfiss.fetchContract">
+        </logger>
+		<flow-ref doc:name="Refer to cf-common-salesforce-upsert" doc:id="7c567cbf-8037-4d52-97eb-6f39e2afd0df" name="cf-common-salesforce-upsert" target="upsertResponse"/>
+		<set-variable value="#[vars.upsertResponse.items[0].Id]" doc:name="SET Var sfContractId" doc:id="b1a93b70-ca75-435f-82f5-e7eb3fb9e932" variableName="sfContractId"/>
+		<validation:is-null doc:name="Contract SF Response Is null" doc:id="ec5b12c5-7ea9-4dca-818a-f60dba835540" config-ref="Validation_Configuration" value="#[vars.upsertResponse.items[0].message]" message="#[vars.upsertResponse.items[0].message]"/>
+		<flow-ref doc:name="Refer to sf-create-optionalExceptions-linItems-stops" doc:id="6878a4c5-9bf4-45ea-9007-365c830a0424" name="sf-create-optionalExceptions-linItems-stops"/>
+		<flow-ref name="sf-update-stopIds" doc:name="Refer to sf-update-stopIds" />
+		<remove-variable doc:name="Remove Var queryResponse" doc:id="6b78fe3b-fe49-4594-b15f-757092ff08d9" variableName="queryResponse" />
+		<remove-variable doc:name="Remove Var upsertResponse" doc:id="c60e267d-ff54-404f-8bad-63ee8283c4c5" variableName="upsertResponse" />
+		<logger message="Fetch Contracts: #[flow.name] Ended for ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum] : Contract data processed successfully " level="INFO" doc:name="LOG INFO Contract Data processed successfully" />		
+	</sub-flow>
+	<sub-flow name="sf-get-account-location-lookup-data" doc:id="0ceb33d4-433b-4dd9-a236-987e8c59c295" >
+		<ee:transform doc:name="DW SET Composite Query for Account, Location lookup" doc:id="3e9324f2-7ec4-4eee-b030-26de66ccffe1" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-signed-contract-sf-lookup-query-request.dwl" />
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="714bed8d-ddea-4f4e-b6a4-a84e542279d6" batchSize="${fetchContract.forEach.rest.batchSize}">
+			<ee:transform doc:name="DW Build Composite Request" doc:id="bac0b355-f592-4d89-a7e5-94f3e0729a49" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	compositeRequest: payload
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-common-salesforce-composite" doc:id="e0da99ee-d6c0-4bb3-8fd1-1ae86abc317f" name="cf-common-salesforce-composite" />
+			<ee:transform doc:name="DW SET Composite Response" doc:id="acd72a22-84f3-4e3d-8bcd-34383a655f0e" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="aggregatedCompositeResponse" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.aggregatedCompositeResponse default []) ++ (payload.compositeResponse default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<ee:transform doc:name="DW SET Compostise Response" doc:id="30a77afd-bc19-479d-9506-a9c3f241d66e" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-signed-contract-sf-lookup-query-response.dwl" />
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="sf-get-stopIds">
+        <ee:transform doc:name="DW Create LocationId Query" doc:id="9532c890-fa62-42d0-8135-6effc94009e6" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/fetch-contracts/v-signed-contract-sf-location-stopId-query-request.dwl" variableName="locationStopIdQuery" />
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="CHECK IF locationStopIdQuery is null">
+            <when expression="#[vars.locationStopIdQuery != null]">
+                <set-variable value="#[p('fetchContract.location.stopId.lookup.query')++ vars.locationStopIdQuery]" doc:name="Set Variable varQuery" doc:id="1f01e4a7-90d5-4d61-8d61-1baf446cf256" variableName="varQuery"/>
+				<flow-ref name="cf-common-salesforce-query" doc:name="Refer to cf-common-salesforce-query" doc:id="b3c6940c-4e09-444c-9bb3-5290d4c4dc25"/>
+				<ee:transform doc:name="DW LocationStopId Payload" doc:id="69e4f45d-dd82-48d4-bc60-10112b315950" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[output application/java
+---
+payload groupBy (($.LcCode__c default '') ++ '-' ++ ($.Name default ''))]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+            
+</when>
+            <otherwise>
+                <logger message="Fetch Contract: ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum] : No StopOvers found for any LineItem records" level="INFO" doc:name="LOG INFO No StopIds to Fetch" />
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+    <sub-flow name="sf-update-stopIds">
+        <ee:transform doc:name="DW SET GET-Composite Request - lineItem_Stop Ids" doc:id="06be262b-3fa3-424e-a79d-560994b05bfc" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-signed-contract-sf-get-lineItem-stopId-composite-request.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref name="cf-common-salesforce-composite" doc:name="Refer to cf-common-salesforce-composite" doc:id="b7149a89-ce7b-42cd-9d78-1c258f80e8e0"/>
+        <ee:transform doc:name="DW SET Update StopIds Payload" doc:id="3a0bd6e7-5236-4d62-8ddf-b039573586c4" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-signed-contract-sf-link-lineItemId-stop-data.dwl" />
+			</ee:message>
+		</ee:transform>
+		<foreach batchSize="${fetchContract.forEach.batchSize}" doc:name="For Each">
+			<ee:transform doc:name="DW SET ObjectType and records" doc:id="f51e8f7f-1a56-4c22-9ecd-3ad924a23431" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{	
+	objectType: "Stop__c",
+	records: payload
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-common-salesforce-update ( Update StopIds with LineItemIds )" doc:id="db35fbf2-e149-4ed8-b14d-8034e4903ae6" name="cf-common-salesforce-update"/>
+        
+</foreach>
+    </sub-flow>
+
+    <sub-flow name="sf-delete-optionalExceptions-linItems-stops" doc:id="e9ec1831-c948-4e72-96f8-16caef6ec8e3">
+        <ee:transform doc:name="DW optionalExceptions, lineItems, stops-query" doc:id="a4d1e513-e66e-4c0c-b99f-ef2fd476595d" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-signed-contract-sf-delete-account-optionalException-lineItem-stopId-request.dwl" />
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<flow-ref name="sf-fetch-delete-ids" doc:name="Refer to sf-fetch-delete-ids" />
+        <logger message="Fetch Contracts: ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum] : All optionalExceptionServices, lineItems, stops deleted" level="INFO" doc:name="LOG INFO Delete Success" />
+    </sub-flow>
+
+    <sub-flow name="sf-fetch-delete-ids">
+        <foreach collection="#[payload]" doc:name="For Each">
+			<set-variable value="#[payload]" doc:name="SET Var varQuery" doc:id="5db5a3e7-df9d-4f45-85f0-63639339cb47" variableName="varQuery"/>
+			<flow-ref doc:name="Refer to cf-common-salesforce-query" doc:id="08b1cdb4-d879-4d3d-8b5e-fbef9a9b5252" name="cf-common-salesforce-query"/>
+			<ee:transform doc:name="DW SET Payload Ids to Delete" doc:id="2d2180ae-bbf3-4678-a2db-ac85f0743b99" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java  
+---
+payload map {
+  Id: ($.Id)
+}.Id]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+            <foreach batchSize="${fetchContract.forEach.batchSize}" doc:name="For Each">
+				<flow-ref doc:name="Refer to cf-common-salesforce-delete ( Delete optionalExceptions/lineItems/Stops )" doc:id="941afb46-ad93-4cbf-8f18-4e961de0d4d5" name="cf-common-salesforce-delete"/>
+            
+</foreach>
+        </foreach>
+    </sub-flow>
+
+    <sub-flow name="sf-create-optionalExceptions-linItems-stops" doc:id="83470785-4ba7-4e26-9e70-d505f97333fa">
+		<ee:transform doc:name="DW optionalExceptions, lineItems, stops-query" doc:id="88cacbf9-f4f7-4bcb-9819-ebf623346992">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable resource="dwl/fetch-contracts/p-signed-contract-sf-create-account-optionalException-lineItem-stopId-request.dwl" variableName="sfSelectQuery" />
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-create-contract-object" doc:id="c879769e-7c29-49c7-b6a7-4a5380c641f3" name="sf-create-contract-object" />
+		<logger level="INFO" doc:name="LOG INFO Create Success" doc:id="0c957186-a7c3-40d8-8bff-0899444d381e" message="Fetch Contract: ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum] : All optionalExceptionServices, lineItems, stops created" />
+	</sub-flow>
+	<sub-flow name="sf-create-contract-object" doc:id="45632d6a-d04f-42c4-96ec-15c31442ca0c">
+        <foreach collection="#[vars.sfSelectQuery]" doc:name="For Each">
+            <set-variable value="#[payload.objectType]" doc:name="Set Variable objectType" doc:id="ac46286f-be23-453c-a967-31891addcb79" variableName="objectType"/>
+			<foreach batchSize="${fetchContract.forEach.batchSize}" doc:name="For Each" collection="#[payload.records]">
+				<ee:transform doc:name="DW SET SF Create Request" doc:id="ed546dce-c3b3-474e-8e9a-91ab5c27c125" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	objectType: vars.objectType,
+	allOrNone: true,
+	records: payload map ((item, index) -> item ++ (if (vars.objectType =="Stop__c") {"Contract_id__c": vars.sfContractId} else {"Contract__c": vars.sfContractId}) )
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-common-salesforce-create ( Create ContractAccount/optionalExceptions/lineItems/Stops )" doc:id="25a95535-508d-4ba7-aef5-ae9292afa1b2" name="cf-common-salesforce-create"/>
+				<ee:transform doc:name="DW SET SF Response" doc:id="3afa9b68-0f42-4835-95e5-1807e42967ec" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+((flatten ((payload.items filter ($.successful== false)) default []  map ((item, index) ->  item.payload.errors.message) )) 
+distinctBy $) joinBy " , "]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<validation:is-blank-string doc:name="Validate SF Response Is blank string" doc:id="b9b94d3c-d202-4591-a7f5-8fc191a17066" value="#[payload]" message='#["SF Error Response - " ++ payload]' config-ref="Validation_Configuration"/>
+            
+
+</foreach>
+        </foreach>
+    </sub-flow>
+	<flow name="pf-update-non-signed-fetch-contract">
+		<logger message='Fetch Contract: #[flow.name] started for NON SIGNED ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]' level="INFO" doc:name="LOG INFO NonSigned flow started" />
+
+        <set-variable value="Error Occurred While Processing Non-Signed Status Fetch Contract Request" doc:name="SET Var errorMessage" doc:id="bc9f6948-06c1-4e42-ba9a-bd769d1f36db" variableName="errorMessage" />
+		<logger message="Fetch Contract: Payload Received for NON SIGNED ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]" level="DEBUG" doc:name="LOG DEBUG Payload received for NonSigned" category="com.crowley.sfiss.fetchContract">
+        </logger>
+
+        <ee:transform doc:name="DW Payload create request data, varQuery" doc:id="ab8aab9f-d74f-4a66-92c4-6b8e7190ab87" >
+			<ee:message >
+				<ee:set-payload resource="dwl/fetch-contracts/p-non-signed-contract-data.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+p('fetchContract.contract.query') ++ "'" ++ (vars.contractStatus.contractNum) ++ (vars.contractStatus.amendmentNum) ++ "'"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-common-salesforce-query" doc:id="02fccf79-197b-46f6-8c5d-ebae7e16799c" name="cf-common-salesforce-query" target="sfContractId" targetValue="#[payload[0].Id]"/>
+
+        <choice doc:name="CHECK IF SFID is present in salesforce">
+            <when expression="#[vars.sfContractId != null]">
+                <ee:transform doc:name="DW Payload Set update request" doc:id="ca772ddd-a3a7-48fb-9e8f-1e6bba0fef91">
+					<ee:message>
+						<ee:set-payload resource="dwl/fetch-contracts/p-non-signed-contract-update-contract-status-request.dwl" />
+					</ee:message>
+				</ee:transform>
+                <flow-ref doc:name="Refer to cf-common-salesforce-update ( Update Contract Status )" doc:id="b995a400-1a4b-405d-8947-6a0d786ab6dd" name="cf-common-salesforce-update"/>
+				<ee:transform doc:name="DW Payload sf Update Reponse" doc:id="a9cb1129-370b-47e0-8246-5f61f321a8ce">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(payload.items filter ($.successful== false))  default [] map  ((item, index) ->   item.message
+) distinctBy $ joinBy ","]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+                <validation:is-blank-string doc:name="Validate SF Response Is blank string" doc:id="eceb14d6-f655-4082-87a5-9457e68e1a4e" value="#[payload]" message='#["SF Error Response - " ++ payload]' config-ref="Validation_Configuration"/>
+                <logger message="Fetch Contract: #[flow.name] flow completed. Data sucessfully updated for ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]" level="INFO" doc:name="LOG INFO contract updated successfully" />
+            
+</when>
+            <otherwise>
+                <logger message="Fetch Contract: Non-signed contract doesn't exist in salesforce for ContractNo: #[vars.contractStatus.contractNum] , AmendmentNo: #[vars.contractStatus.amendmentNum]" level="INFO" doc:name="LOG INFO Record doesn't exist in salesforce" />
+				<set-variable value="Contract Not Found in Salesforce" doc:name="SET Var errorMessage" doc:id="12c4747f-78ac-4809-8655-683158aa01a8" variableName="errorMessage" />
+				<ee:transform doc:name="DW SET Case Request" doc:id="2ead5c95-7a21-4828-bb16-9ec7fe3c7976">
+					<ee:message>
+						<ee:set-payload resource="dwl/fetch-contracts/p-non-signed-error-case-data.dwl" />
+					</ee:message>
+				</ee:transform>
+				<async doc:name="Async" doc:id="44633f2a-7d09-48df-8fff-7c8e38a11731">
+					<flow-ref doc:name="Refer to mf-case-creation" doc:id="ec2468f4-c98a-4d59-b111-12a71f3cfa4d" name="mf-case-creation" />
+				</async>
+				<ee:transform doc:name="DW SET Error Message" doc:id="de635c82-28c9-49ea-b7d6-156cf722f9ca">
+					<ee:message>
+						<ee:set-payload resource="dwl/fetch-contracts/p-error-notification-data.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref name="cf-invoke-notification-service" doc:name="cf-invoke-notification-service" doc:id="0778223f-931a-4f24-a74a-b9af01a96a7d"/>
+            
+</otherwise>
+        </choice>
+		<error-handler ref="fetch-contracts-error-handler" />
+
+    
+</flow>
+
+
+</mule>

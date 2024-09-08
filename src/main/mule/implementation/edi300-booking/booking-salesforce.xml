@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apachekafka="http://www.mulesoft.org/schema/mule/apachekafka" xmlns:compatibility="http://www.mulesoft.org/schema/mule/compatibility" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/apachekafka http://www.mulesoft.org/schema/mule/apachekafka/current/mule-apachekafka.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/compatibility http://www.mulesoft.org/schema/mule/compatibility/current/mule-compatibility.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+	<flow name="booking-processing">
+		<ee:transform doc:name="booking payload" doc:id="6e1c2f14-7002-4f66-9550-d8ac016fc28c" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="storedPayload" ><![CDATA[%dw 2.0
+output application/java
+fun formatDateType1(date) = (date as Date {format: "yyyy-MM-dd"}) default null
+fun formatDateType2(date) = (date as Date {format: "MM/dd/yyyy"}) default null
+fun formatDateType3(date) = (date as LocalDateTime { format: "yyyy/MM/dd-HH.mm.ss" }) default null
+fun formatDateType4(date) = (date as LocalDateTime) default null
+fun formatTimeType(time) = (time as Time) default null
+
+var bookingVar = [payload.booking[0] -- { Booked_Date__c : ((payload.booking[0].Booked_Date__c))}
+                                     -- { Hazardous_Lock_Date__c : (formatDateType1(payload.booking[0].Hazardous_Lock_Date__c))} 
+                                     ++ { Booked_Date__c : (formatDateType1(payload.booking[0].Booked_Date__c))}
+                                     ++ { Hazardous_Lock_Date__c : (formatDateType1(payload.booking[0].Hazardous_Lock_Date__c))}
+                                     -- { Hazardous_Lock_Time__c : ((payload.booking[0].Hazardous_Lock_Time__c))}
+                                     ++ { Hazardous_Lock_Time__c : (formatTimeType(payload.booking[0].Hazardous_Lock_Time__c))}
+                 ]
+
+var partyVar = payload.parties
+
+var transportVar = payload.transports default [] map (transport, indexOfTransport) -> {
+    transport: (transport.transport),
+    stops: transport.stops default [] map (stop, indexOfstop) -> {
+        ((stop) -- { Pick_up_Date__c : ((stop.Pick_up_Date__c))}
+                ++ { Pick_up_Date__c : (formatDateType1(stop.Pick_up_Date__c))}
+                -- { Drop_Date__c : ((stop.Drop_Date__c))}
+                ++ { Drop_Date__c : (formatDateType1(stop.Drop_Date__c))}
+        )
+    }
+}
+
+var bookingRemarkVar= payload.bookingRemarks default [] map (bkngRemarks, indexOfbkngRemarks) -> {
+    ((bkngRemarks) -- { Timestamp__c : ((bkngRemarks.Timestamp__c))}
+                   ++ { Timestamp__c : (formatDateType3(bkngRemarks.Timestamp__c))}
+    )
+}
+
+var shipmentVar= payload.shipments default [] map (shipment, indexOfShipment) -> {
+	shipment: (shipment.shipment),
+    custNotifications: shipment.custNotifications default [] map (custNotify, indexOfcustNotify) ->
+	{
+		((custNotify)   -- { Equipment_Exit_Date_by_Carrier__c : ((custNotify.Equipment_Exit_Date_by_Carrier__c))} 
+                        ++ { Equipment_Exit_Date_by_Carrier__c : (formatDateType1(custNotify.Equipment_Exit_Date_by_Carrier__c))}
+                        -- { Equipment_Exit_Time_by_Carrier__c : ((custNotify.Equipment_Exit_Time_by_Carrier__c))} 
+                        ++ { Equipment_Exit_Time_by_Carrier__c : (formatTimeType(custNotify.Equipment_Exit_Time_by_Carrier__c))}
+        )
+	},
+    voyages: shipment.voyages default [] map (voyage, indexOfVoyage) -> {
+        ( (voyage)  -- { Estimate_Arrival_Date__c : ( (voyage.Estimate_Arrival_Date__c))}
+                    -- { Estimate_Sail_Date__c : ((voyage.Estimate_Sail_Date__c))}
+                    -- { Actual_Sail_Date__c : ((voyage.Actual_Sail_Date__c))}
+                    -- { Actual_Arrival_Date__c : ((voyage.Actual_Arrival_Date__c))}
+                    ++ { Estimate_Arrival_Date__c : (formatDateType2(voyage.Estimate_Arrival_Date__c))}
+                    ++ { Estimate_Sail_Date__c : (formatDateType2(voyage.Estimate_Sail_Date__c))}
+                    ++ { Actual_Sail_Date__c : (formatDateType2(voyage.Actual_Sail_Date__c))}
+                    ++ { Actual_Arrival_Date__c : (formatDateType2(voyage.Actual_Arrival_Date__c))}
+        )
+    },
+    receipts: shipment.receipts default [] map (receipt, indexOfReceipt) -> {
+        ((receipt)  -- { Received_Date__c : ( (receipt.Received_Date__c))}
+                    -- { Release_Date__c : ( (receipt.Release_Date__c))}
+                    -- { Return_Date__c : ( (receipt.Return_Date__c))}
+                    -- { Release_Time__c : ( (receipt.Release_Time__c))}
+                    -- { Return_Time__c : ( (receipt.Return_Time__c))}
+                    ++ { Received_Date__c : (formatDateType1(receipt.Received_Date__c))}
+                    ++ { Release_Date__c : (formatDateType1(receipt.Release_Date__c))}
+                    ++ { Return_Date__c : (formatDateType1(receipt.Return_Date__c))}
+                    ++ { Release_Time__c : (formatTimeType(receipt.Release_Time__c))}
+                    ++ { Return_Time__c : (formatTimeType(receipt.Return_Time__c))}
+        )
+    },
+   	freightDetails: shipment.freightDetails default [] map (freight, indexOfFreight) -> {
+            freightDetail : (freight.freightDetail),
+            commodities: freight.commodities default [] map ( commodity , IndexOfCommodity) -> {
+                (commodity)
+            },
+            cargoItems: freight.cargoItems default [] map ( cargo, IndexOfcargoItem) -> {
+                cargoItem: (cargo.cargoItem),
+                vehicleBreakbulkDetails: cargo.vehicleBreakbulkDetails default [] map (vehicleBreakbulkDetail, IndexOfvehicleBreakbulkDetail) -> {
+                	vehicleBreakbulkDetail: (vehicleBreakbulkDetail.vehicleBreakbulkDetail)
+                }
+            },
+       		requirements: freight.requirements default [] map (requirement, IndexOfCommodity) -> {
+                requirement : ((requirement.requirement) -- { Equipment_Availability_Time__c : (requirement.requirement.Equipment_Availability_Time__c)}
+                                                         ++ { Equipment_Availability_Time__c : (formatDateType1(requirement.requirement.Equipment_Availability_Time__c))}
+                              ),
+       			equipments: requirement.equipments default [] map (equipment, indexOfequipment) -> {
+                       ((equipment) -- { Date__c : ( (equipment.Date__c))}
+                                    -- { Receive_Date__c : ( (equipment.Receive_Date__c))}
+                                    ++ { Date__c : (formatDateType4(equipment.Date__c))}
+                                    ++ { Receive_Date__c : (formatDateType1(equipment.Receive_Date__c))}
+                       )
+                   }
+               }
+    }
+}
+---
+{
+    bookingId   			: payload.bookingId default null,
+    idPresent 				: payload.idPresent default null,
+    booking     			: bookingVar,
+    shipments   			: shipmentVar,
+    parties                 : partyVar,
+    transports              : transportVar,
+    bookingRemarks          : bookingRemarkVar,
+    dateOfBookingCheck 		: payload.dateOfBookingCheck default null,
+    action					: payload.action default null,
+  	bookingIdToBeChecked	: payload.bookingIdToBeChecked default null,
+  	bookingReferenceNumber	: payload.bookingReferenceNumber default null
+}]]></ee:set-variable>
+				<ee:set-variable variableName="idPresent" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.idPresent]]></ee:set-variable>
+				<ee:set-variable variableName="bookingId" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.bookingId]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log storedPayload" doc:id="5d8c09cf-7fd4-4167-ab37-26e397e7c102" message="#[vars.storedPayload]" category="com.crowley.booking-process"/>
+		<choice doc:name="Choice -update/create/delete/none">
+            <when expression='#[(vars.storedPayload.action == "C" or vars.storedPayload.action == "A") and vars.idPresent == true and vars.storedPayload.dateOfBookingCheck]'>
+                <logger message="#[&quot;update flow started for Booking ID/ Booking Reference Number : $(vars.storedPayload.bookingIdToBeChecked)&quot;]" level="INFO" doc:name="update flow started" />
+                <flow-ref name="booking-upsert" doc:name="booking-upsert" />
+                <flow-ref name="parties-update" doc:name="parties-update" />
+				<flow-ref doc:name="transports-update" doc:id="b8ed8409-4ed6-4c1f-8dd3-2b2dc8ce423f" name="transports-update" />
+				<flow-ref doc:name="shipment-update" doc:id="63e4227f-dc1c-4724-95bb-f1682c6bf80d" name="shipment-update" />
+				<flow-ref doc:name="bookingRemarks-update" doc:id="d69401d6-6083-4864-99ea-16a2699e854f" name="bookingRemarks-update"/>
+				<flow-ref doc:name="updateFlowCompletedAndJSONPayload" doc:id="567bd54a-03dd-47a1-aba0-632750800d60" name="updateFlowCompletedAndJSONPayload"/>
+				<logger level="INFO" doc:name="successfully updated" doc:id="8a0f3f98-a22f-4276-92df-04de087948d5" message="======= Successfully Updated for booking - #[vars.storedPayload.bookingIdToBeChecked]  =============="/>
+            </when>
+            <when expression='#[vars.storedPayload.action == "A" and vars.idPresent == false]'>
+                <logger message="#[&quot;create flow started  for Booking ID/ Booking Reference Number : $(vars.storedPayload.bookingIdToBeChecked)&quot;]" level="INFO" doc:name="create flow started" />
+                <flow-ref name="booking-upsert" doc:name="booking-upsert" />
+                <flow-ref name="parties-create" doc:name="parties-create" />
+				<flow-ref doc:name="transports-create" doc:id="a3fbb69f-67bd-46f8-b606-e4f5aa5527fc" name="transports-create"/>
+				<flow-ref doc:name="shipments-create" doc:id="7ee97b71-6e9f-49dc-949c-884a02dc58bd" name="shipments-create"/>
+				<flow-ref doc:name="bookingRemarks-create" doc:id="a120990c-dc34-4f2b-abaf-dbae2d5b57ab" name="bookingRemarks-create"/>
+				<flow-ref doc:name="updateFlowCompletedAndJSONPayload" doc:id="4c1cef63-8bf5-4d30-853c-6c65bf19919d" name="updateFlowCompletedAndJSONPayload" />
+				<logger level="INFO" doc:name="successfully created" doc:id="8630b545-fce0-4243-aba3-2895ba6eec0b" message="successfully created for booking - #[vars.storedPayload.bookingIdToBeChecked]"/>
+            </when>
+            <when expression='#[vars.storedPayload.action == "D" and vars.idPresent == true]'>
+                <logger message="#[&quot;delete flow started  for Booking ID/ Booking Reference Number : $(vars.storedPayload.bookingIdToBeChecked)&quot;]" level="INFO" doc:name="delete flow started" />
+                <flow-ref doc:name="booking-delete" doc:id="4f558f71-57da-486d-8a18-42e5dc7aa804" name="booking-delete" />
+				<logger message="======= Successfully Deleted ==============" level="INFO" doc:name="successfully deleted" />
+            </when>
+            <otherwise>
+                <logger message="#[&quot;'exception in execution of flow for booking ID/Booking Reference Number:' + $(vars.storedPayload.bookingIdToBeChecked);&quot;]" level="INFO" doc:name="exception in execution of flow" />
+				<ee:transform doc:name="set ERROR" doc:id="54955f3c-2ea8-4dc5-a2bc-3d8012d72c47" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+var ExactReason = vars.storedPayload match {
+	case x if (x.action == "C" and  ( not x.dateOfBookingCheck )) ->  "Booking is older than one year and Action performed is Update "
+    case x if (x.action == "C" and x.dateOfBookingCheck) ->  "Booking does not exist in Salesforce and Action performed is Update "
+    case x if (x.action == "D") ->  "Booking does not exist in Salesforce and Action performed is Delete "
+    case x if (x.action == "A") ->  "Booking already exists in Salesforce and Action performed is Create "
+	else -> "information not available "
+}
+---
+{
+	"message": "Validation failed for booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": ExactReason,
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref doc:name="refer to notification service" doc:id="f25389b1-6568-4ef4-9dec-3063adfd8eee" name="common-error-notification" />
+            </otherwise>
+        </choice>
+		<error-handler ref="edi300-booking-error-handlingError_Handler" />
+    </flow>
+
+</mule>

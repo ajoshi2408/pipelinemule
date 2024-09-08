@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka"
+	xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"	
+	xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" 
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" 
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd 
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite 
+http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="cc6c432c-f83f-47f7-a105-1536023909cb" file="properties\config-${env}.yaml" doc:description="Configuration Properties"/>
+	<configuration-properties doc:name="sfdc_properties-configuration" doc:id="743e1b8e-b30d-4e03-ab21-30dc028434a2" file="properties\sfdc-config.yaml" doc:description="Configuration Properties"/>
+	<global-property doc:name="Global Property" doc:id="4ae0aa08-4428-4eea-98a5-916831293d2b" name="env" value="qa" doc:description="Global Property to define in which environment"/>
+	<secure-properties:config name="secure_properties-configuration" doc:name="Secure Properties Config" doc:id="fd90f74c-0e67-4234-b800-de0cb3e7c20e" file="properties\config-secure-${env}.yaml" key="${mule.key}" doc:description="Secure Configuration Properties">
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<global-property doc:name="Global Property" doc:id="f9722b00-cc70-4534-a677-38d91f7a7dad" name="mule.key" value="cr0wl3y!@#$" doc:description="Mule Secure Key"/>
+	<http:request-config
+		name="common_notification_service_https-requestor-configuration"
+		doc:name="HTTP Request configuration"
+		doc:id="611ea6f7-cb4e-455f-9db1-b8d0298f82bd"
+		basePath="${notification-system-service.basePath}" doc:description="Common Notification Service">
+		<http:request-connection protocol="HTTPS"
+			host="${notification-system-service.host}"
+			port="${notification-system-service.port}" connectionIdleTimeout="${notification-system-service.connectionTimeOut}">
+			<reconnection >
+				<reconnect frequency="${notification-system-service.reconnection.frequency}" count="${notification-system-service.reconnection.attempts}" />
+			</reconnection>
+			<tls:context>
+				<tls:trust-store insecure="true" />
+			</tls:context>
+		</http:request-connection>
+		<http:default-headers >
+			<http:default-header key="client_id" value="${secure::https.clientId}" />
+			<http:default-header key="client_secret" value="${secure::https.clientSecret}" />
+			<http:default-header key="Content-Type" value="application/json" />
+		</http:default-headers>	
+	</http:request-config>
+	<http:request-config name="common_support_ticket_http-requestor-configuration" doc:name="HTTP Request configuration" doc:id="3f083b8c-3be0-4a0a-a691-ab39a4ff5110" basePath="${support-system-service.basePath}" doc:description="Common Support Ticket">
+		<http:request-connection protocol="HTTPS" host="${support-system-service.host}" port="${support-system-service.port}" connectionIdleTimeout="${support-system-service.connectionTimeOut}">
+			<reconnection >
+				<reconnect frequency="${support-system-service.reconnection.frequency}" count="${support-system-service.reconnection.attempts}" />
+			</reconnection>
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+		</http:request-connection>
+		<http:default-headers >
+			<http:default-header key="client_id" value="${secure::https.clientId}" />
+			<http:default-header key="client_secret" value="${secure::https.clientSecret}" />
+			<http:default-header key="Content-Type" value="application/json" />
+		</http:default-headers>
+	</http:request-config>
+	<db:config name="common_database_object_store-configuration" doc:name="Database Config" doc:id="027179f0-3d0a-4dec-8353-d0ba827572a4" doc:description="Common database configuration to get email templates">
+		<db:mssql-connection host="${sql.host}" port="${sql.port}" user="${sql.user}" password="${secure::sql.password}" databaseName="${sql.database}" >
+			<reconnection >
+				<reconnect frequency="${sql.reconnection.frequency}" count="${sql.reconnection.attempts}" />
+			</reconnection>
+		</db:mssql-connection>
+	</db:config>
+	<vm:config name="common_vm-config" doc:name="VM Config"
+		doc:id="e853cedc-5664-464b-a751-fb2c80dcab4a" doc:description="common VM configuration">
+		<vm:connection >
+			<reconnection >
+				<reconnect frequency="${vm.reconnection.frequency}" count="${vm.reconnection.attempts}" />
+			</reconnection>
+		</vm:connection>
+		<vm:queues>
+			<vm:queue queueName="${vm.queueName.credit}" queueType="PERSISTENT" />
+			<vm:queue queueName="${vm.queueName.hacienda}" queueType="PERSISTENT" />
+			<vm:queue queueName="${vm.queueName.customerVendor}" queueType="PERSISTENT" />
+			<vm:queue queueName="${cusres.vm.queue}" queueType="PERSISTENT" />
+			<vm:queue queueName="${baplie.final.queue}" queueType="PERSISTENT" />
+			<vm:queue queueName="${vm.queueName.fetchContract}" queueType="PERSISTENT" />
+		</vm:queues>
+	</vm:config>	
+	<kafka:consumer-config name="Apache_Kafka_Consumer_configuration" doc:name="Apache Kafka Consumer configuration" doc:id="f279f3c7-1449-4371-867a-c0792b87e4cd" doc:description="Kafka Consumer Connection Configuration for Account Credit Topic">
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.creditAccount}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+	<salesforce:sfdc-config name="common_salesforce-configuration"
+		doc:name="Salesforce Config"
+		doc:id="e636cd3c-94c3-48e8-a714-9e5c46414133" doc:description="Common Salesforce Configuration used to update salesforce objects">
+		<salesforce:basic-connection
+			username="${salesforce.username}" password="${secure::salesforce.password}"
+			url="${salesforce.authorizationurl}" connectionTimeout="${salesforce.connectionTimeout}">
+			<reconnection >
+				<reconnect count="${salesforce.retry}" frequency="${salesforce.reconnectionFrequency}"/>
+			</reconnection>
+		</salesforce:basic-connection>
+	</salesforce:sfdc-config>
+	<kafka:consumer-config name="tmw990KafkaConsumerConfig" doc:name="Apache Kafka Consumer configuration" doc:id="d7f5444b-b8b8-4bd4-a9e7-078e87344cde" >
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.tmw990}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+	<vm:config name="TMW990vmConfig" doc:name="VM Config" doc:id="40fe085e-fe22-4b97-b0aa-6482651f1186" >
+		<vm:queues >
+			<vm:queue queueName="tmw990-async-vm-queue" queueType="PERSISTENT" />
+		</vm:queues>
+	</vm:config>
+	<validation:config name="Validation_Configuration" doc:name="Validation Config" doc:id="b220ec7f-3f34-4068-978a-002fb8670f8a" />
+	<apikit:config name="salesforce-inbound-system-service-config" api="salesforce-inbound-system-service.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+	<http:listener-config name="main_http-listener" doc:name="HTTP Listener config" doc:id="3c97761c-dbea-49ad-b652-7e021cd5d414">
+        <http:listener-connection host="${https.private.host}" port="${https.private.port}" protocol="HTTPS" readTimeout="${https.readTimeout}" connectionIdleTimeout="${https.idleTimeout}">
+            <tls:context>
+				<tls:key-store keyPassword="${secure::https.certificate.key.password}" password="${secure::https.certificate.store.password}" path="${https.certificate.keystore}"/>
+            </tls:context>
+        </http:listener-connection>
+    </http:listener-config>
+	<http:request-config name="common_sf_case_http-request-config" doc:name="HTTP Request configuration" doc:id="c19552f6-7a60-4db0-889b-e6c4f8b72d67" doc:description="HTTP Requester used to get case details from SF" responseTimeout="${salesforce.responseTimeout}">
+		<http:request-connection host="${salesforce.case.host}" port="${salesforce.port}" protocol="HTTPS">
+			<reconnection >
+				<reconnect frequency="${salesforce.reconnectionFrequency}" count="${salesforce.retry}"/>
+			</reconnection>
+		</http:request-connection>
+	</http:request-config>
+	<salesforce-composite:composite-config
+		name="common_salesforce_composite-configuration"
+		doc:name="Salesforce Composite Config"
+		doc:id="d329e61f-0525-468b-83c2-659f3e18b90d" doc:description="Common Salesforce Composite Config">
+		<salesforce-composite:oauth-user-pass-connection
+			consumerKey="${secure::salesforce.consumerKey}"
+			consumerSecret="${secure::salesforce.consumerSecret}"
+			username="${salesforce.username}"
+			password="${secure::salesforce.password}" securityToken="${secure::salesforce.securityToken}"
+			tokenEndpoint="${salesforce.tokenUrl}" responseTimeout="${salesforce.composite.responseTimeout}" connectionTimeout="${salesforce.composite.connectionTimeout}">
+			<reconnection >
+				<reconnect count="${salesforce.retry}" frequency="${salesforce.reconnectionFrequency}"/>
+			</reconnection>
+		</salesforce-composite:oauth-user-pass-connection>
+	</salesforce-composite:composite-config>
+	<http:request-config name="common_sf_http-request-config" doc:name="HTTP Request configuration" doc:id="3e797bdb-9f12-4620-829c-8069f3201906" doc:description="Common HTTP Requester used to call SF " responseTimeout="${salesforce.responseTimeout}">
+		<http:request-connection host="${salesforce.host}" port="${salesforce.port}" protocol="HTTPS">
+			<reconnection >
+				<reconnect frequency="${salesforce.reconnectionFrequency}" count="${salesforce.retry}"/>
+			</reconnection>
+		</http:request-connection>
+    </http:request-config>
+	<ee:object-store-caching-strategy name="common_sf_caching-strategy" doc:name="Caching Strategy" doc:id="ef683181-d3c3-4a5b-a884-d15b85913e65" keyGenerationExpression="#['AccessToken']" doc:description="Cache Strategy used to cache SF Access token">
+		<os:private-object-store maxEntries="${cache.maxEntries}" entryTtl="${cache.ttl}" entryTtlUnit="MILLISECONDS" expirationInterval="${cache.expiration}" expirationIntervalUnit="MILLISECONDS"/>
+	</ee:object-store-caching-strategy>
+	<api-gateway:autodiscovery apiId="${api.id}" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="b9b15880-ed32-41b8-869d-18357125253f" flowRef="salesforce-inbound-system-service-main" />
+	<sftp:config name="truck_carriers_sftp-configuration" doc:name="SFTP Config" doc:id="140e7d13-8215-4ffa-975a-217c28c898db" >
+		<sftp:connection workingDir="${truck.sftp.directory.path}" host="${truck.sftp.host}" port="${truck.sftp.port}" username="${truck.sftp.username}" password="${secure::truck.sftp.password}" connectionTimeout="${truck.sftp.timeout.connection}" responseTimeout="${truck.sftp.timeout.response}">
+		</sftp:connection>
+	</sftp:config>
+	<vm:config name="truck_carriers_vm-configuration" doc:name="VM Config" doc:id="9681fbd5-096f-4ef9-8d3c-e824ecab937a" sendCorrelationId="ALWAYS">
+		<vm:queues >
+			<vm:queue queueName="${truck.vm.queue}" queueType="PERSISTENT" />
+		</vm:queues>
+	</vm:config>
+	<ftp:config name="hacienda_ftp-configuration" doc:name="FTP Config"
+		doc:id="21256cc5-c536-4d4b-9d15-5a618bd799b9">
+		<ftp:connection host="${hacienda.ftp.host}"
+			port="${hacienda.ftp.port}" username="${hacienda.ftp.username}"
+			password="${secure::hacienda.ftp.password}" responseTimeout="${hacienda.ftp.responsetimeout}" connectionTimeout="${hacienda.ftp.connectiontimeout}">
+			<pooling-profile maxActive="${hacienda.ftp.maxActive}" maxIdle="${hacienda.ftp.maxIdle}" maxWait="${hacienda.ftp.maxWait}" minEvictionMillis="${hacienda.ftp.minEvictionMillis}" evictionCheckIntervalMillis="${hacienda.ftp.evictionCheckIntervalMillis}" />
+		</ftp:connection>
+	</ftp:config>
+	<kafka:consumer-config name="customerVendorKafkaConsumerConfig" doc:name="Apache Kafka Consumer configuration" doc:id="9fbeef9b-60a2-4c28-a929-768f7a05dfd6" >
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.customerVendor}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+	<http:request-config name="customer_vendor_http_request_configuration" doc:name="HTTP Request configuration" doc:id="631cf730-de7c-472b-a855-e7af75ae36fb" basePath="/${customer-vendor-business-service-2.basePath}" responseTimeout="${customer-vendor-business-service-2.responseTimeOut}">
+		<http:request-connection host="${customer-vendor-business-service-2.host}" port="${customer-vendor-business-service-2.port}" connectionIdleTimeout="${customer-vendor-business-service-2.connectionTimeOut}" >
+			<reconnection >
+				<reconnect frequency="${customer-vendor-business-service-2.reconnection.frequency}" count="${customer-vendor-business-service-2.reconnection.attempts}" />
+			</reconnection>
+		</http:request-connection>
+		<http:default-headers >
+			<http:default-header key="client_id" value="${secure::https.clientId}" />
+			<http:default-header key="client_secret" value="${secure::https.clientSecret}" />
+			<http:default-header key="Content-Type" value="application/json" />
+		</http:default-headers>
+	</http:request-config>
+	<salesforce:sfdc-config name="cdm_salesforce_configuration" doc:name="Salesforce Config" doc:id="73a9eed0-18a4-4559-b365-3cf4bdb24fce" >
+		<salesforce:basic-connection username="${cdm.sf.username}" password="${secure::cdm.sf.password}" url="${cdm.sf.authorizationurl}" >
+			<reconnection >
+				<reconnect count="${salesforce.retry}" frequency="${salesforce.reconnectionFrequency}"/>
+			</reconnection>
+		</salesforce:basic-connection>
+	</salesforce:sfdc-config>
+	<kafka:consumer-config name="CUSRES_Apache_Kafka_Consumer_configuration" doc:name="Apache Kafka Consumer configuration" doc:id="17a2b943-792f-441d-a905-55b2975e7ff3" >
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.cusres}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+	<s3:config name="Amazon_S3_Basic_Configuration" doc:name="Amazon S3 Configuration" doc:id="3217e683-3259-44cb-88b1-c738ef997d3f" >
+		<s3:connection accessKey="${secure::aws.s3.accessKey}" secretKey="${secure::aws.s3.secretKey}" responseTimeoutUnit="MICROSECONDS">
+			<reconnection >
+				<reconnect frequency="${aws.s3.frequency}" count="${aws.s3.attempts}" />
+			</reconnection>
+		</s3:connection>
+	</s3:config>
+	
+	<kafka:consumer-config name="Baplie_final_Apache_Kafka_Consumer_configuration" doc:name="Apache Kafka Consumer configuration" doc:id="bd88816b-224e-46b5-b348-e9a7a2e90d1b" >
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.baplieFinal}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+	<kafka:consumer-config name="contractVendorKafkaConsumerConfig" doc:name="Apache Kafka Consumer configuration" doc:id="e5180020-84e4-48ac-b1c8-3be096565d6c" >
+		<kafka:consumer-sasl-plain-connection groupId="${kafka.consumer.groupId}" username="${kafka.consumer.username}" password="${secure::kafka.consumer.password}" endpointIdentificationAlgorithm="https">
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<kafka:bootstrap-servers >
+				<kafka:bootstrap-server value="${kafka.bootstrapservers}" />
+			</kafka:bootstrap-servers>
+			<kafka:topic-patterns >
+				<kafka:topic-pattern value="${kafka.consumer.topic.contractConf}" />
+			</kafka:topic-patterns>
+		</kafka:consumer-sasl-plain-connection>
+	</kafka:consumer-config>
+
+</mule>

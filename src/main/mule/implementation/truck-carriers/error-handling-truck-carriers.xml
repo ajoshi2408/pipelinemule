@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<sub-flow name="sf-error-truck-carriers-any-mule-notification"
+		doc:id="80fabf1e-90cf-4cf1-adee-b02ae9d63809">
+		<ee:transform
+			doc:name="DW Error Email Notification Payload &amp; Set writePath Variable"
+			doc:id="a6ada4e3-486b-4594-a81c-fbbc056a6a54">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/truck-carriers/p-truck-carriers-mule-any-error-notification.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/truck-carriers/v-truck-carriers-error-write-path.dwl" variableName="writePath" />
+			</ee:variables>
+		
+</ee:transform>
+		<logger level="ERROR"
+			doc:name="LOG ERROR Inside Any Mule Error Flow"
+			doc:id="7e6b59e8-a5ec-4439-8232-a036857c5973"
+			message="#[flow.name] : Before Calling Notification Service For File - #[vars.fileName]" />
+		<flow-ref doc:name="Refer to cf-invoke-notification-service"
+			doc:id="0259c62b-b199-4f2e-a8a4-12198696aa32"
+			name="cf-invoke-notification-service" />
+		<flow-ref
+			doc:name="Refer to sf-write-truck-carriers-data-in-sftp-directory"
+			doc:id="618425ab-d350-4c6d-9395-e7cb53801120"
+			name="sf-write-truck-carriers-data-in-sftp-directory" />
+	</sub-flow>
+	<sub-flow name="sf-error-truck-carriers-support-ticket"
+		doc:id="1a34a5fe-0718-4eac-90d8-b2b447b139d9">
+		<ee:transform doc:name="DW Error Support Ticket Payload &amp; Set writePath Variable"
+			doc:id="a7a41067-d5d3-48be-ba44-913594fca445">
+			<ee:message>
+				<ee:set-payload resource="dwl/truck-carriers/p-truck-carriers-error-support-incident.dwl" />			
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/truck-carriers/v-truck-carriers-error-write-path.dwl" variableName="writePath" />
+			</ee:variables>
+		
+</ee:transform>
+		<logger level="ERROR"
+			doc:name="LOG ERROR Inside Support Ticket Error Flow"
+			doc:id="dfbe9f22-0bec-4ba2-9a86-362b9a7c2331"
+			message="#[flow.name] : Before Calling Support Ticket For File - #[vars.fileName]" />
+		<flow-ref
+			doc:name="Refer to cf-invoke-support-ticket-service"
+			doc:id="db227f9f-d9f3-4ff9-8bcc-2d4891463aa8"
+			name="cf-invoke-support-ticket-service" />
+		<flow-ref
+			doc:name="Refer to sf-write-truck-carriers-data-in-sftp-directory"
+			doc:id="d5b0cea5-7199-46b2-b451-dd9eb6bfe8f6"
+			name="sf-write-truck-carriers-data-in-sftp-directory" />
+	</sub-flow>
+	<sub-flow name="sf-error-truck-carriers-data-issue"
+		doc:id="1fd457f8-15c4-46e8-a2f3-116d63c3a37c">
+		<logger level="ERROR" doc:name="LOG ERROR Incorrect Truck Carriers Data" doc:id="0d2e541e-8f2f-4e46-8e75-9c3430167acb" message="Incorrect Truck Carrier's Data for file: #[vars.fileName] ,  #[vars.fileInput.incorrectTruckData]"/>
+		<ee:transform
+			doc:name="DW Map Data Error Details in Var fileDataDetails &amp; Set writePath Variable"
+			doc:id="95105782-6d59-4ade-a538-a72251e8e8a8">
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/truck-carriers/v-truck-carriers-error-file-data-details.dwl"
+					variableName="fileDataDetails" />
+				<ee:set-variable
+					resource="dwl/truck-carriers/v-truck-carriers-data-issue-message.dwl"
+					variableName="dataMsgCause" />
+				<ee:set-variable resource="dwl/truck-carriers/v-truck-carriers-error-write-path.dwl" variableName="writePath" />
+			</ee:variables>
+		</ee:transform>
+		<ee:transform
+			doc:name="DW Select dataIssuePayload transformation"
+			doc:id="2cda6473-171f-4cd2-82b0-2c7207145e27">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/truck-carriers/p-truck-carriers-data-issue-email-notification.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="ERROR"
+			doc:name="LOG ERROR Inside Data Issue Error Flow"
+			doc:id="ac9b417f-3d23-45d2-8d79-8ab8e7d51c17"
+			message="#[flow.name] :  Inside Data Error, Before Calling Notification Service For File - #[vars.fileName]" />
+		<flow-ref doc:name="Refer to cf-invoke-notification-service"
+			doc:id="84623d08-a00c-4b16-8e86-7cae17edd74c"
+			name="cf-invoke-notification-service" />
+	</sub-flow>
+	<sub-flow name="sf-error-truck-carrier-sftp-write"
+		doc:id="130a9f4a-d5e7-4148-a645-2dda2ddf175c">
+		<ee:transform
+			doc:name="DW Error Email Notification Payload"
+			doc:id="bd01fd4e-69d5-4a22-be5a-e71dadefc9d3">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/truck-carriers/p-truck-carriers-error-sftp-write-notification.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="ERROR"
+			doc:name="LOG ERROR Inside SFTP Write Error Before Notification Service"
+			doc:id="5beabce5-6b4a-46c8-bd97-bb09c3b89c3c"
+			message="#[flow.name] : Before Calling Notification Service For File - #[vars.fileName]" />
+		<flow-ref doc:name="Refer to cf-invoke-notification-service"
+			doc:id="c43a9292-6988-434d-a487-97d5eabb4959"
+			name="cf-invoke-notification-service" />
+		<ee:transform doc:name="DW Error Support Ticket Payload"
+			doc:id="4d1b766c-74c1-45c2-92d3-19ee8de1ab54">
+			<ee:message>
+				<ee:set-payload resource="dwl/truck-carriers/p-truck-carriers-error-support-incident.dwl" />		
+			</ee:message>
+		</ee:transform>
+		<logger level="ERROR"
+			doc:name="LOG ERROR Inside SFTP Write Error Before Support Ticket"
+			doc:id="6abdbe39-4fa8-4a96-b1ae-da3e865a8e3f"
+			message="#[flow.name] : Before Calling Support Ticket For File - #[vars.fileName]" />
+		<flow-ref
+			doc:name="Refer to cf-invoke-support-ticket-service"
+			doc:id="e8c4a746-eef9-4658-aadd-e295c682ed9b"
+			name="cf-invoke-support-ticket-service" />
+	</sub-flow>
+	<error-handler
+		name="error-handling-truck-carriers-vm-listener-flow"
+		doc:id="aba9a239-d049-4cc8-bde4-7c9afc85dcb0">
+		<on-error-propagate enableNotifications="true"
+			logException="true" doc:name="On Error Propagate"
+			doc:id="384aebc5-c434-4c40-ade6-0c555a71e1aa"
+			type="SALESFORCE-COMPOSITE:CONNECTIVITY">
+			<logger level="ERROR"
+				doc:name="LOG ERROR Inside VM Listener Main Flow"
+				doc:id="ad9ca199-eafd-49af-9248-f10213d9ec3f"
+				message="VM Listener Main Flow - Salesforce Compsite Connectivity Error Occured for File: #[vars.fileName]" />
+			<flow-ref
+				doc:name="Refer to sf-error-truck-carriers-support-ticket"
+				doc:id="afca29d1-b6ea-4597-b38e-c191f73e03bc"
+				name="sf-error-truck-carriers-support-ticket" />
+		</on-error-propagate>
+		<on-error-propagate enableNotifications="true"
+			logException="true" doc:name="On Error Propagate"
+			doc:id="3391874c-a06b-42d3-8e47-33f3bab2e2aa" type="ANY">
+			<logger level="ERROR"
+				doc:name="LOG ERROR Inside VM Listener Main Flow"
+				doc:id="ac0d131a-1fce-4bfd-bb9b-e2cace0dda58"
+				message="VM Listener Main Flow - #[error.errorType.asString] : Error Occured for File: #[vars.fileName]" />
+			<set-variable
+				value='#["Error Occurred in VM Listener Main Flow"]'
+				doc:name="FV SET message for error"
+				doc:id="8c1e6864-25e8-4eeb-8b8c-ce7c1c75402d" variableName="message" />
+			<flow-ref
+				doc:name="Refer to sf-error-truck-carriers-any-mule-notification"
+				doc:id="0c83c9ea-21f8-4733-92dd-f545eabf669b"
+				name="sf-error-truck-carriers-any-mule-notification" />
+		</on-error-propagate>
+	</error-handler>
+</mule>

@@ -1,0 +1,65 @@
+{
+    "graphs": [
+        {
+            "graphId": 1701949896,
+            "compositeRequest": [
+                {
+                    "method": "POST",
+                    "referenceId": "refUS_Customs_Status__cId",
+                    "url": "/services/data/v52.0/sobjects/US_Customs_Status__c",
+                    "body": {
+                        "Transaction_Set__c": "350",
+                        "Partner_Id__c": "CUSTOMS",
+                        "Gs_Control_Nmbr__c": 62743,
+                        "Gs_Date__c": "2023-12-07",
+                        "Gs_Time__c": "06:50:00",
+                        "Header_Scac__c": "CLAM",
+                        "Header_Reference_Type__c": "",
+                        "Header_Reference_Number__c": "",
+                        "Scac__c": "CLAM",
+                        "Tran_Method_Code__c": "O",
+                        "Country_Code__c": "AG",
+                        "Vessel_Code__c": "9389423",
+                        "Vessel_Name__c": "BREEZE",
+                        "Voyage_Number__c": "NZV3158",
+                        "Manifest_Seq_Nmbr__c": "000001",
+                        "Manifest_Type_Code__c": "Z",
+                        "Vessel_Code_Qual__c": "L",
+                        "Vessel_Event__c": "",
+                        "Bill_of_Lading__c": "a2k5G000002bFWUQA2"
+                    }
+                },
+                {
+                    "method": "POST",
+                    "referenceId": "refUS_Customs_Port_Release__cPostId543062519525_289189203371879500_5595425701997508Release_Equipment292",
+                    "url": "/services/data/v52.0/sobjects/US_Customs_Port_Release__c",
+                    "body": {
+                        "Equip_Initial3__c": "FCIU",
+                        "Equip_Number3__c": "9244060",
+                        "RecordTypeId": "0125G000001cmirQAA",
+                        "US_Customs_Port_Parent__c": "@{refUS_Customs_Port_Release__cPostId1568656622840_8108944768428480_49455106737117294Port_Release0.id}"
+                    }
+                },
+                {
+                    "method": "POST",
+                    "referenceId": "refUS_Customs_Port_Release__cPostId1229543455274_34920646826355500_6980653871438101Release_Equipment302",
+                    "url": "/services/data/v52.0/sobjects/US_Customs_Port_Release__c",
+                    "body": {
+                        "Equip_Initial3__c": "BMOU",
+                        "Equip_Number3__c": "6198596",
+                        "RecordTypeId": "0125G000001cmirQAA",
+                        "US_Customs_Port_Parent__c": "@{refUS_Customs_Port_Release__cPostId1568656622840_8108944768428480_49455106737117294Port_Release0.id}"
+                    }
+                },
+                {
+                    "method": "PATCH",
+                    "referenceId": "refUS_Customs_Status__cId_flow_completed",
+                    "url": "/services/data/v52.0/sobjects/US_Customs_Status__c/@{refUS_Customs_Status__cId.id}",
+                    "body": {
+                        "Flow_Completed__c": true
+                    }
+                }
+            ]
+        }
+    ]
+}

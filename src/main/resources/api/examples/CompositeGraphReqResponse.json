@@ -1,0 +1,48 @@
+{
+    "graphs": [
+        {
+            "graphId": "1",
+            "graphResponse": {
+                "compositeResponse": [
+                    {
+                        "body": {
+                            "id": "001R00000064wc7IAA",
+                            "success": true,
+                            "errors": []
+                        },
+                        "httpHeaders": {
+                            "Location": "/services/data/v52.0/sobjects/US_Customs_Status__c"
+                        },
+                        "httpStatusCode": 201,
+                        "referenceId": "reference_id_account_1"
+                    },
+                    {
+                        "body": {
+                            "id": "003R000000DDMlTIAX",
+                            "success": true,
+                            "errors": []
+                        },
+                        "httpHeaders": {
+                            "Location": "/services/data/v52.0/sobjects/US_Customs_Port_Release__c"
+                        },
+                        "httpStatusCode": 201,
+                        "referenceId": "reference_id_contact_1"
+                    },
+                    {
+                        "body": {
+                            "id": "006R0000003FPYxIAO",
+                            "success": true,
+                            "errors": []
+                        },
+                        "httpHeaders": {
+                            "Location": "/services/data/v52.0/sobjects/US_Customs_Port_Release__c"
+                        },
+                        "httpStatusCode": 201,
+                        "referenceId": "reference_id_opportunity_1"
+                    }
+                ]
+            },
+            "isSuccessful": true
+        }
+    ]
+}

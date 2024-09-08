@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<sub-flow name="sf-get-booking-json" doc:id="13c98a0b-c5b2-4d84-b450-01d94d290e15" >
+		<logger level="INFO" doc:name="Log Booking Confirmation No. [INFO]" doc:id="6eac920c-38bf-4a42-b4c0-3090bfc5fa02" message="[API-Booking]:: Connecting Salesforce to Fetch Booking with Booking Confirmation Number: #[vars.bookingConfNumber]" />
+		<ee:transform doc:name="Set booking number payload" doc:id="fb04f2e1-ac17-42d0-ad66-a99152706530" >
+			<ee:message >
+				<ee:set-payload resource="dwl/get-booking-json/p-sf-fetch-booking-payload.dwl" />
+
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to z-common-apex-salesforce" doc:id="0ef37676-7fce-4031-9002-064a93500a8c" name="z-common-apex-salesforce"/>
+		<ee:transform doc:name="Set getBookingDetailsOutput to payload" doc:id="062ee3be-ed98-49ea-901e-54af5b02b2f0" >
+			<ee:message >
+				<ee:set-payload resource="dwl/get-booking-json/p-read-fetch-booking-response.dwl" />
+			
+</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/get-booking-json/v-booking-sfIsSuccess.dwl" variableName="sfIsSuccess" />
+			
+</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check sfIsSuccess == true" doc:id="c1768912-8980-4986-8bb2-a884c7385513" >
+			<when expression="#[vars.sfIsSuccess]">
+				<logger level="INFO" doc:name="Log Booking found" doc:id="03392985-7918-4771-91c1-7be53f054f36" message="[API-Booking]::Booking found in SF for Booking Number: #[vars.bookingConfNumber]"/>
+				<logger level="DEBUG" doc:name="[DEBUG] Log Payload" doc:id="36c58332-8e73-45d9-a762-34c6d9bbd84d" message="[API-Booking]::SF Payload before global conversion: #[payload]" category="com.api.booking"/>
+				<ee:transform doc:name="Convert to Global Format" doc:id="a0a93e5a-4c3f-4284-a023-1943f2864c84" >
+					<ee:message >
+						<ee:set-payload resource="dwl/get-booking-json/p-json-to-global-json.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="[DEBUG] Log Payload" doc:id="5eb46d09-3438-40d5-a879-941a8c6c517e" message="[API-Booking]::SF Payload after global conversion: #[%dw 2.0 output application/json indent=false --- payload]" category="com.api.booking" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Log Booking NOT found" doc:id="f89891aa-f448-42ae-9b47-167ac96bbff2" message="[API-Booking]::Booking not found in SF for Booking Number: #[vars.bookingConfNumber]" />
+				<ee:transform doc:name="Set Response" doc:id="88fac3ca-a1e1-400d-93b5-d72ae98a25d2" >
+					<ee:message >
+						<ee:set-payload resource="dwl/get-booking-json/p-booking-not-found-response.dwl" />
+
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Log flow completed" doc:id="b3f04668-5d13-4cfc-8bae-59ead628f5d5" message="[API-Booking]::Get Booking JSON flow completed for Booking Number: #[vars.bookingConfNumber]"/>
+	
+	</sub-flow>
+</mule>

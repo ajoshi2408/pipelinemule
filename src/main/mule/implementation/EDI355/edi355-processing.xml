@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="mf-edi355-sf-processing" doc:id="60e45752-7e5d-4ba3-8adf-588a2c28e296" >
+		<logger level="INFO" doc:name="LOG INFO EDI355 Flow Start" doc:id="58f87eba-3df7-4cbc-ad0d-d5171fa8ea0d" message="[EDI355] customsManifestResponse processing flow starts"/>
+		<ee:transform doc:name="DW VARIABLE Original Payload" doc:id="f0d37417-87aa-42be-b991-b1128f5122f9" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable resource="dwl/EDI355/v-EDI355-originalPayload.dwl" variableName="originalPayload" />
+				<ee:set-variable resource="dwl/EDI355/v-EDI355-manifestRefId.dwl" variableName="manifestRefId" />
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-query-edi355" doc:id="7d3a30ff-d370-4949-a9f8-1904761e5e4f" name="sf-query-edi355" target="queryPayload" targetValue="#[payload[0]]"/>
+		<choice doc:name="Choice" doc:id="5a47640c-216c-4ead-9321-99fb005e9866" >
+			<when expression="#[isEmpty(vars.queryPayload)]">
+				<logger level="INFO" doc:name="Logger" doc:id="f9a87cba-d0f5-4221-b763-25206a3fc5ab" message="No manifestRefId is present in salesforce with number- #[vars.manifestRefId]"/>
+				<ee:transform doc:name="Transform Message" doc:id="cfdec2e4-db7c-4e01-bdbd-7f62bc6274b8" >
+					<ee:message >
+						<ee:set-payload resource="dwl/EDI355/p-EDI355-response.dwl" />
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<flow-ref doc:name="Refer to sf-EDI355-processing" doc:id="0d30631c-6a25-4511-8994-7ddaa4782bf3" name="sf-EDI355-processing" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="LOG INFO EDI355 Flow End" doc:id="5aa8fc70-c814-4c99-8d42-318c60bf9a42" message="[EDI355] customsManifestResponse processing flow completed with manifestRefId--#[vars.manifestRefId]"/>
+	</flow>
+	<sub-flow name="sf-EDI355-processing" doc:id="fb7547e3-a77d-44ea-9c3e-e1e72c542606" >
+		<logger level="INFO" doc:name="LOG INFO Create Composite Request" doc:id="274902c5-f86b-4857-8f43-646d9636747b" message="[EDI355] Creating composite request for salesforce with manifestRefId--#[vars.manifestRefId]" />
+		<ee:transform doc:name="DW PAYLOAD BOL Composite Request" doc:id="3b2213a0-82bd-4a4f-90d9-14ba8724c7ae">
+			<ee:message>
+				<ee:set-payload resource="dwl/EDI355/p-EDI355-composite-request.dwl" />
+			
+</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG Call Salesforce" doc:id="487eb3ad-c90d-47a7-b84b-afdb47f9dcca" message="[EDI355] Calling Salesforce to insert edi355 data with manifestRefId--#[vars.manifestRefId] and payload--#[payload]" category="com.crowley.EDI355"/>
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite" doc:id="5230d37c-d784-45b6-b1f2-9b3cd48f26be" name="cf-common-salesforce-composite"/>
+		<ee:transform doc:name="Transform Message" doc:id="a5261e48-3bac-4e69-99de-9dfecf6fe059" >
+			<ee:message >
+				<ee:set-payload resource="dwl/EDI355/p-EDI355-composite-response.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG INFO Salesforce Response" doc:id="589661c8-59e4-4113-a98e-43e19e8a50fa" message="[EDI355] Salesforce response received for manifestRefId--#[vars.manifestRefId] is--#[payload]"/>
+	</sub-flow>
+	<sub-flow name="sf-query-edi355" doc:id="79f7f111-6ae7-45ff-8479-4a3ecd451248" >
+		<logger level="INFO" doc:name="LOG INFO- SF Query Flow Start" doc:id="051d7448-4826-47c4-89b5-8e181378dde5" message="Querying salesforce to get the manifestRefId for: #[vars.manifestRefId]"/>
+		<salesforce:query doc:name="Query" doc:id="3054f67c-3afb-4cc1-a169-07c7da14dca5" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[Select Id, US_Customs_Manifest__r.Name, Version_Number__c, US_Customs_Manifest__c from US_Manifest_Version__c where US_Customs_Manifest__r.Name= ':manifestRefId' and Manifest_Status__c ='Submitted'  order by Version_Number__c desc]]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"manifestRefId" : vars.manifestRefId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="LOG INFO- SF Query Result" doc:id="770a0fb1-356d-4fdb-b206-fd9b22395035" message='Querying to Salesforce ends for manifestRefId: #[vars.manifestRefId]'/>
+	</sub-flow>
+	</mule>

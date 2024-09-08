@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<sub-flow name="cf-get-salesforce-token"
+		doc:id="9ca64d2c-83ca-41c3-85f9-1219225a36b5">
+		<ee:cache doc:name="CACHE SF Access Token"
+			doc:id="e33bf17a-2991-4d2a-a28b-8f64437393bb"
+			cachingStrategy-ref="common_sf_caching-strategy">
+			<http:request method="POST"
+				doc:name="POST - SF Token API"
+				doc:id="76febe12-3f18-4063-87d5-aa00ea4ac529"
+				config-ref="common_sf_http-request-config" path="${salesforce.authUrl}">
+				<http:query-params><![CDATA[#[output application/java
+---
+	{
+	grant_type: "password",
+	client_id: p('secure::salesforce.consumerKey'),
+	client_secret: p('secure::salesforce.consumerSecret'),
+	username: p('salesforce.username'),
+	password: p('secure::salesforce.password')
+}]]]></http:query-params>
+			</http:request>
+			<ee:transform
+				doc:name="DW SET Payload as SF Token Response"
+				doc:id="374666ac-af97-43e5-a219-e8702e9778e2">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+ payload."token_type" ++ " " ++ payload."access_token"
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</ee:cache>
+	</sub-flow>
+</mule>

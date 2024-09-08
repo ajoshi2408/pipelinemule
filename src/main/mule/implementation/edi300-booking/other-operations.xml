@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:compatibility="http://www.mulesoft.org/schema/mule/compatibility" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:sfdc-composite="http://www.mulesoft.org/schema/mule/sfdc-composite" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/sfdc-composite http://www.mulesoft.org/schema/mule/sfdc-composite/current/mule-sfdc-composite.xsd http://www.mulesoft.org/schema/mule/compatibility http://www.mulesoft.org/schema/mule/compatibility/current/mule-compatibility.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+	<flow name="booking-upsert">
+
+        <ee:transform doc:name="set booking-payload" doc:id="e30be1d0-0cff-4270-9c51-f70b8b92218e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.booking]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="bookingExternalId" ><![CDATA[%dw 2.0
+output application/json
+---
+"Booking_Number__c"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger message="Going to invoke Salesforce upsert on ExternalID : #[vars.bookingExternalId] with payload : #[payload]" level="DEBUG" doc:name="Log data before upsert" category="com.crowley.booking-process"/>
+
+        <salesforce:upsert doc:name="Upsert" doc:id="fdafb1ee-fa4c-4d6a-a0b5-24e3a15fd18a" config-ref="common_salesforce-configuration" objectType="Booking__c" externalIdFieldName="#[vars.bookingExternalId]"/>
+		<validation:is-true doc:name="validate-booking" doc:id="9e275832-bc68-48fc-96ce-4f6282739728" config-ref="Validation_Configuration" expression="#[payload.successful]" message="Error occoured in Booking Upsert Operation"/>
+		<ee:transform doc:name="set bookings Id" doc:id="1eebc83e-c77a-4899-8ddf-d4afdae69274" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="bookingsid" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger message="============= SF response after booking :: #[payload]" level="DEBUG" doc:name="log sf response" category="com.crowley.booking-process"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c4f8a622-72cc-4bef-81d9-85ad30196d15" >
+				<ee:transform doc:name="set ERROR" doc:id="0106ee1c-79f6-4007-9a7b-56d0b5ac2298" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to upsert booking with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (payload.items[0].message) ) (payload.items[0].message) else if ( not isEmpty(error) ) error.description
+else "Upsert operation for EDI300 Booking has failed",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="9b495109-204e-46c3-a2e4-374d3814e857" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process" />
+			</on-error-propagate>
+		</error-handler>
+		
+
+    </flow>
+    
+    <flow name="updateFlowCompletedAndJSONPayload" >
+        <logger message="Updating FlowCompleted flag and global JSON payload in Salesforce for booking: #[vars.storedPayload.bookingIdToBeChecked]" level="INFO" doc:name="Log flow completed start" />
+		<ee:transform doc:name="setUpdatePayload" doc:id="2cdfd700-479f-48a9-9486-fb74c1e83f25" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	objectType 	: "Booking__c",
+	records		:	[{
+    					"Id": vars.bookingsid,
+    					"MS_Flow_Completed__c": true,
+    					(if (vars.storedPayload.booking[0].EDI_Booking__c != null and vars.storedPayload.booking[0].EDI_Booking__c == true) "EDI_Booking_Request_JSON__c" else "CICS_SF_Json__c") : write (vars.originalPayload, "application/json")
+					}]
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to cf-common-salesforce-update" doc:id="b43520be-798c-481f-90c1-30d0ecdf0b2b" name="cf-common-salesforce-update"/>
+
+        <logger message="After updating FlowCompleted Flag and global JSON payload :: #[payload]" level="DEBUG" doc:name="Log sf response" category="com.crowley.booking-process"/>
+
+        <validation:is-true config-ref="Validation_Configuration" message="unable to update FlowCompleted flag and global JSON payload" expression="#[payload.successful]" doc:name="validate-successful-operation" />
+
+        <error-handler>
+            <on-error-continue doc:name="Catch Exception Strategy">
+				<ee:transform doc:name="set ERROR" doc:id="2ce51cc5-4cd9-41d9-87ca-ff966bf5e41f" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "FlowCompletedFlag and global JSON update failed for Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else "",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="813065ae-89f7-4b75-a20b-5c90f89b5295" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="fda3c82b-c164-4abf-b846-e46b12c9d817" name="common-error-notification" />
+            </on-error-continue>
+        </error-handler>
+
+    </flow>
+</mule>

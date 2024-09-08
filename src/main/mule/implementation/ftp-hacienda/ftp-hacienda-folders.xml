@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+<sub-flow name="sf-hacienda-ftp-cics-folder" doc:id="c030b4ed-6fc7-4b5f-a606-af347c3adf07" >
+		<logger level="INFO" doc:name="LOG INFO Message with Filename before Sending File to CICS folder" doc:id="a11674af-37ed-41b9-9098-10995237d2e8" message="HACIENDA: Writing file: #[vars.haciendaFileName] to FTP CICS folder " />
+		<set-variable value="CICS Folder" doc:name="errorAtFTPFolder" doc:id="b7b8e06d-6dbe-4e72-8ffb-28304315c460" variableName="errorAtFTPFolder" />
+		<ftp:write doc:name="FTP Hacienda CICS folder" doc:id="e7d353c8-81b3-445b-b916-67d60f39f1d5" config-ref="hacienda_ftp-configuration" path="#[p('hacienda.ftp.cics.path') ++ (vars.haciendaFileName default &quot;&quot;)]" createParentDirectories="false" >
+			<reconnect frequency="${hacienda.ftp.reconnectionFrequency}" count="${hacienda.ftp.retry}"/>
+		</ftp:write>
+		<ee:transform doc:name="DW PAYLOAD Set Details for Sending CICS Success Notification" doc:id="d3af879f-f867-4537-8272-c064b6ee907c" >
+			<ee:message >
+				<ee:set-payload resource="dwl/hacienda-files/p-success-cics-notification.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="0c178eee-a409-4ba4-ac85-74123a66d864" name="cf-invoke-notification-service" />	
+</sub-flow>
+	<sub-flow name="sf-hacienda-ftp-error-folder" doc:id="80ed19ef-4114-434d-aabb-c419d9a0fb73" >
+		<logger level="INFO" doc:name="LOG INFO Message with Filename" doc:id="ef810f27-254e-4722-bf1d-5fbacc1a27e6" message="HACIENDA: Writing file #[vars.haciendaFileName] to FTP Error Folder" />
+		<set-variable value="Error Folder" doc:name="errorAtFTPFolder" doc:id="d4c62fab-c870-4dbb-bd2c-5807d8324a4a" variableName="errorAtFTPFolder" />
+		<set-variable value="#[vars.haciendaPayload]" doc:name="FV SET haciendaErrorPayload[text/plain]" doc:id="5031153f-be46-4136-85e7-81f6d27bf23e" variableName="haciendaErrorPayload" mimeType="text/plain" />
+		<ftp:write doc:name="FTP Move File to Error Folder" doc:id="ead91b25-182a-4cc8-aee4-6274fe798f43" config-ref="hacienda_ftp-configuration" path="#[p('hacienda.ftp.error.path') ++ (vars.haciendaFileName default &quot;&quot;)]" createParentDirectories="false" >
+			<reconnect frequency="${hacienda.ftp.reconnectionFrequency}" count="${hacienda.ftp.retry}" />
+			<ftp:content ><![CDATA[#[vars.haciendaErrorPayload default ""]]]></ftp:content>
+		</ftp:write>
+</sub-flow>
+	<sub-flow name="sf-hacienda-ftp-archive-folder" doc:id="667ed8c8-3158-44b5-8648-4e564df3cf44" >
+		<logger level="INFO" doc:name="LOG INFO Message with Filename" doc:id="4baea7f0-bda8-4104-8473-c4a1a9e45df9" message="HACIENDA: Writing file #[vars.haciendaFileName] to FTP Archive folder" />
+		<set-variable value="Archive Folder" doc:name="errorAtFTPFolder" doc:id="8b9d0a1e-ef5c-403c-a6e6-14e206189aeb" variableName="errorAtFTPFolder"/>
+		<ftp:write doc:name="FTP Hacienda Archive Folder" doc:id="fc35acc0-d0c0-4830-bdb9-a974eb851901" config-ref="hacienda_ftp-configuration" path="#[p('hacienda.ftp.mulearchive.path') ++ (vars.haciendaFileName default &quot;&quot;)]" createParentDirectories="false" >
+			<reconnect frequency="${hacienda.ftp.reconnectionFrequency}" count="${hacienda.ftp.retry}" />
+			<ftp:content ><![CDATA[#[vars.haciendaPayload]]]></ftp:content>
+		</ftp:write>
+	</sub-flow>	
+	</mule>

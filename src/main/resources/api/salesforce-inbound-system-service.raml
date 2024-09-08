@@ -1,0 +1,272 @@
+#%RAML 1.0
+title: salesforce-inbound-system-service
+version: v1
+protocols:  [HTTPS]
+traits: 
+  secured: !include traits/Secured.raml
+  errorResponse: !include traits/ErrorResponse.raml
+
+types:
+  paymentReceipt: !include dataTypes/paymentReceipt/payment-receipt.raml
+
+/case:
+  post:
+    description: Case Creation in Salesforce
+    displayName: Case Creation
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        type: !include dataTypes/CaseCreation.raml
+        example: !include examples/CaseCreationInput.json      
+    responses:
+      201:
+        body:
+          application/json:
+            example: 
+              { "Message": "Success" }
+              
+              
+/EDIShippingInstruction:
+  post:
+    description: EDI304 processing in Salesforce
+    displayName: EDi304 processing
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        example: !include examples/EDI304/EDI304Input.json     
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/EDI304/EDI304Response.json
+            
+
+/apex:
+  post:
+    description: REST APEX Method Call in Salesforce
+    displayName: Apex Method
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        example: !include examples/Apex/ApexInput.json     
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/Apex/ApexResponse.json
+/credits:
+  /{docId}:
+    uriParameters:
+      docId:
+        required: true
+        type: number
+        displayName: Customer Account Credit data Doc ID
+        description: Customer Account Credit data Doc ID present in Oracle BI Report
+    get:
+      displayName: Process Credit Information to Salesforce for specified Doc ID
+      is: [secured,errorResponse]     
+      responses:
+        200:
+          body:
+            application/json:
+              example: 
+                { "Message": "Success" }
+            
+/MDM:
+    description:
+    post:
+      headers:
+        entity:
+          type: string
+          required: true
+          description: Specifies the entity that needs to be synced
+        X-Correlation-Id:
+          type: string
+          required: true
+          description: This Id helps track the transaction throughout its lifecycle
+      description: Post softship vessel details JSON
+      is: [secured,errorResponse]
+      body:
+        application/json :
+           description: "softship vessel details Request"
+           examples: 
+            vesselDeatils: !include examples/MDM/mdmVesselDetailRequest.json
+            portalCarModel: !include examples/MDM/mdmPortalCarModelRequest.json
+            equipmentType: !include examples/MDM/mdmEquipmentTypeRequest.json
+            subLocation: !include examples/MDM/mdmSubLocationRequest.json
+            location: !include examples/MDM/mdmLocationRequest.json
+            equipmentList: !include examples/MDM/mdmEquipmentListRequest.json                                            
+      responses: 
+        202:
+          body: 
+            application/json:
+              description: "Common Response"
+              example: !include examples/MDM/mdmCommonResponse.json
+
+/cash-payments:
+   post:
+     is: [secured] 
+     body:
+       application/json:
+         type: paymentReceipt
+         example: !include /examples/paymentReceipts/payment-receipt-request.json                      
+     responses:
+       200:
+         body:
+           application/json:  
+             example:
+               { "message": "success" }
+            
+/customsManifestResponse:
+  post:
+    description: EDI355 processing
+    displayName: EDI355 - US Customs Manifest Acceptance/Rejection
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        example: !include examples/EDI355/EDI355Input.json     
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/EDI355/EDI355Response.json
+            
+/billOfLading:
+  /{BoLId}:
+    description: 'Fetch Riskonnect related BoL fields from C Sight'
+    uriParameters:
+      BoLId:
+        type: string
+        required: true
+    get:
+      description: This endpoint fetches Riskonnect related BoL fields from C Sight
+      is: [secured,errorResponse]
+      responses:
+        200:
+          body:
+            application/json:
+              example: !include examples/billOfLading/billOfLadingResponse.json
+              
+/bookingBoLs:
+  /{BookingNbr}:
+    description: 'Fetches all BoLs tagged to a Booking from C Sight'
+    uriParameters:
+      BookingNbr:
+        type: string
+        required: true
+    get:
+      description: 'Fetches all BoLs tagged to a Booking from C Sight'
+      is: [secured,errorResponse]
+      responses:
+        200:
+          body:
+            application/json:
+              example: !include examples/billOfLading/billOfLadingResponse.json         
+              
+/voyageInfo:
+  /{BoLId}:
+    description: 'Fetch Riskonnect related voyage fields from C Sight'
+    uriParameters:
+      BoLId:
+        type: string
+        required: true
+    get:
+      description: This endpoint fetches Riskonnect related voyage fields from C Sight
+      is: [secured,errorResponse]
+      responses:
+        200:
+          body:
+            application/json:
+              example: !include examples/voyageInfo/voyageInfoResponse.json
+
+/compositeRequest:
+  post:
+    description: To access salesforce using salesforce composite connnector
+    displayName: Access salesforcs using salesforce composite connnector
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        example: !include examples/CompositeReqInput.json    
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/CompositeReqResponse.json
+/compositeGraph:
+  post:
+    description: To access salesforce grapgh API using salesforce composite connnector
+    displayName: Access salesforcs graph API using salesforce composite connnector
+    is: [secured,errorResponse]
+    body:
+      application/json:
+        example: !include examples/CompositeGraphReqInput.json    
+    responses:
+      200:
+        body:
+          application/json:
+            example: !include examples/CompositeGraphReqResponse.json
+
+/booking-process:
+  post:
+    description:  Process EDI300 Booking Information to Salesforce 
+    displayName: EDI300 Booking Process
+    is: [secured]
+    body:
+      application/json:
+        example: !include examples/storedPayload.json    
+    responses:
+      200:
+        description:  Sucessful processing of EDI300 Booking data.
+        body:
+          application/json:
+            example: 
+              { "Message": "Success" }           
+
+              
+/bookings:
+  /confirmation:
+    /{bookingConfirmationNumber}:
+      uriParameters:
+        bookingConfirmationNumber:
+          required: true
+          displayName: BookingConfirmationNumber
+          description: Booking Confirmation number received as part of the status check
+      get:
+        displayName: BookingConfirmation
+        is: [secured]      
+        responses:
+          200:
+            body:
+              application/json:
+                example: !include examples/bookings/bookingConfirmationResponse.json
+  /status:
+    /{bookingReferenceNumber}:
+      uriParameters:
+        bookingReferenceNumber:
+          required: true
+          displayName: BookingReferenceNumber
+          description: Booking Transaction Reference Number received as part of the status check
+      get:
+        displayName: BookingStatus
+        is: [secured]      
+        responses:
+          200:
+            body:
+              application/json:
+                example: !include examples/bookings/bookingStatusReponse.json      
+
+/DCS-flag:
+  post:
+    description:  Update DCS Cleared Flag against BOL-Equipment Number combination in Salesforce 
+    displayName: DCS Cleared Flag Update
+    is: [secured]
+    body:
+      application/json:
+        example: !include examples/DCS/DCSRequest.json   
+    responses:
+      200:
+        description:  Success Response
+        body:
+          application/json:
+            example: !include examples/DCS/SFResponse.json
+              

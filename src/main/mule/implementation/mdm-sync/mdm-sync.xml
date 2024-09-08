@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd">
+	<flow name="mf-MDM-processing" doc:id="8ee20605-dc46-4751-baaa-50ef1b1a8084">
+		<logger level="INFO" doc:name="LOG INFO Records being processed" doc:id="fc250cd4-3831-44ff-ac96-e0073f7dbe9b" message='#[vars.entityName default " "  ++ " : " ++ (payload.entityUniqueField joinBy ",")]'/>
+		<flow-ref doc:name="Refer to sf-map-entityFields"
+			doc:id="bced86c3-9759-4b06-820f-f2d57aa676bd"
+			name="sf-map-entityFields" />
+		<choice doc:name="Check IF Reprocess Records Exist"
+			doc:id="6945b241-74ae-438a-bc3e-2ff98842fbd0">
+			<when expression="#[sizeOf(vars.reprocessRecords) &gt; 0]">
+				<ee:transform
+					doc:name="DW SET Payload reprocessRecords"
+					doc:id="d73345d0-687c-4710-890a-df6c1b772929">
+					<ee:message>
+						<ee:set-payload resource="dwl/mdm-sync/p-reprocessRecords.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<remove-variable doc:name="Remove Variable reprocessRecords"
+					doc:id="708f7a45-d235-4530-96f4-500747dc14eb"
+					variableName="reprocessRecords" />
+				<flow-ref doc:name="Refer to sf-map-entityFields"
+					doc:id="956ad5ca-02b3-4bad-a7b5-62197b130e92"
+					name="sf-map-entityFields" />
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Records Processed Successfully"
+					doc:id="21444987-42c3-4605-97da-9e07a6e4aca9"
+					message='#[vars.entityName default " " ++ " : All Records in current transaction processed successfully"]' />
+			</otherwise>
+		</choice>
+		<choice doc:name="Check IF Failed Records Exist"
+			doc:id="48468caa-4c79-4fd9-8ab4-79acda69318b">
+			<when expression="#[sizeOf(vars.failedRecords) &gt; 0]">
+				<ee:transform doc:name="DW SET Result Payload"
+					doc:id="f8c499c2-810c-4c5a-bc82-153affd84ba2">
+					<ee:message>
+						<ee:set-payload resource="dwl/mdm-sync/p-logResult.dwl" />
+
+					
+</ee:message>
+					<ee:variables>
+					</ee:variables>
+
+				</ee:transform>
+				<logger level="INFO" doc:name="LOG INFO Payload" doc:id="a88f23ee-92b6-4e14-b94d-51e280f9ed42" message='#[payload]' />
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="10c14ef2-98c7-4213-bee2-7f97798e55cf" name="cf-invoke-notification-service"/>
+			
+</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Records Processed Successfully"
+					doc:id="ccd6e2e3-fd13-47c6-b6ad-cdc680ec328a"
+					message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;&#10;	startTime : vars.StartTime,&#10;	endTime : now(),&#10;	status : vars.entityName default " " ++ " : All Records in current transaction processed successfully"&#10;}]' />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="LOG INFO Sync Complete" doc:id="5b8b6364-4967-4968-a4ad-c56fb8e4f691" message='#[vars.entityName ++ " Sync Completed !"]'/>
+		<error-handler ref="mdm-sync-common-error-handler" />
+	
+</flow>
+	<sub-flow name="sf-map-entityFields"
+		doc:id="5b10b208-2c4f-43bb-820e-2eb2444b0392">
+		<foreach doc:name="For Each-executes-500-recordsBatch"
+			doc:id="43a002b7-5809-4b17-ae7a-6699d4d24e27" batchSize="${MDM.batchSize}">
+			<ee:dynamic-evaluate doc:name="Evaluate Enity DWL"
+				doc:id="af67b7f5-7c6a-42d7-96a8-1eef5ff716af"
+				expression="#[vars.entity]">
+			</ee:dynamic-evaluate>
+<logger level="DEBUG" doc:name="LOG DEBUG Composite Graph Request" doc:id="24a39da7-e790-4827-8370-633becbe888a" message="#[payload]" category="com.crowley.sfibss.mdm"/>
+			<flow-ref doc:name="Refer to cf-common-salesforce-composite-graph" doc:id="21fd3c2d-c2b7-41af-b860-4a40b69ff13e" name="cf-common-salesforce-composite-graph" target="sfResponse"/>
+			<logger level="DEBUG" doc:name="LOG DEBUG Composite Graph Response" doc:id="0e81686f-bb08-4dbb-aa58-e7b29975c298" message="#[vars.sfResponse]" category="com.crowley.sfibss.mdm" />
+			<choice doc:name="Check IF Failed Records Exist"
+				doc:id="852e2ea9-349e-4abb-8003-6f0ddbf982c5">
+				<when
+					expression="#[vars.sfResponse.graphs.isSuccessful[0] == false]">
+					<ee:transform
+						doc:name="DW SET FV failureRecords/reprocessRecords"
+						doc:id="1eabc2cb-2845-47c0-88f9-04d064f518a6">
+						<ee:message>
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable resource="dwl/mdm-sync/v-reprocessRecords.dwl" variableName="reprocessRecords" />
+							<ee:set-variable resource="dwl/mdm-sync/v-failedRecords.dwl" variableName="failedRecords" />
+						
+</ee:variables>
+					</ee:transform>
+					<!-- <set-variable value='#[%dw 2.0 &#10;output application/json&#10;-&#45;&#45;&#10;vars.failedRecords 
+						++ (flatten(vars.sfResponse.graphs.graphResponse.compositeResponse) map {&#10; 
+						referenceId : $.referenceId,&#10; errorCode : $.body.errorCode[0],&#10; message 
+						: $.body.message[0],&#10; httpStatusCode: $.httpStatusCode&#10;} filter ($.errorCode 
+						!= "PROCESSING_HALTED" or $.message != "The transaction was rolled back since 
+						another operation in the same transaction failed.")) default []]' doc:name="failedRecords" 
+						doc:id="e9a7fead-2dca-476a-92e1-be5c1852f063" variableName="failedRecords" 
+						/> <set-variable value='#[%dw 2.0 &#10;output application/json&#10;-&#45;&#45;&#10;vars.reprocessRecords 
+						++ (flatten(vars.sfResponse.graphs.graphResponse.compositeResponse) map {&#10; 
+						referenceId : $.referenceId,&#10; errorCode : $.body.errorCode[0],&#10; message 
+						: $.body.message[0]&#10;} filter $.errorCode == "PROCESSING_HALTED" and $.message 
+						== "The transaction was rolled back since another operation in the same transaction 
+						failed.") default []]' doc:name="reprocessRecords" doc:id="dfb028d7-04f0-492d-97e9-d7f64995629d" 
+						variableName="reprocessRecords" /> -->
+					<logger level="DEBUG" doc:name="LOG DEBUG failed/reprocess Records" doc:id="460e9a7f-5aae-4fda-b0db-acd3cbebca16" message="#[{&#10;	failedRecords : vars.failedRecords,&#10;	reprocessRecords : vars.reprocessRecords&#10;}]" category="com.crowley.sfibss.mdm" />
+				
+</when>
+				<otherwise>
+					<logger level="INFO"
+						doc:name="LOG INFO Records Processed Successfully"
+						doc:id="59444a7e-f355-4ec8-9eae-ae2934560e1c"
+						message='#[vars.entityName default " " ++  " : All records in current batch processed successfully"]' />
+
+				</otherwise>
+			</choice>
+
+		</foreach>
+
+	</sub-flow>
+
+</mule>

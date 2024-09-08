@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="billOfLading-common-error-handler" doc:id="820c99a6-0c0b-4c8f-a79d-037ce2cac166" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue - Connectivity Errors" doc:id="8422bce3-4876-4759-9258-2dba05a2c050" type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED">
+			<ee:transform doc:name="DW SET Payload Support Ticket" doc:id="eadf8a56-3f3c-41b5-9c21-d51a39c3ccd4" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-billOfLading/p-support-ticket-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors" doc:id="7833d856-1fda-4895-942a-397436c5118c" message="[billOfLading] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="2fee9262-47fa-47b6-8f68-42bcc0eeee2a" name="cf-invoke-support-ticket-service"/>
+			<ee:transform doc:name="DW SET Payload Notification" doc:id="2a5addd6-ccce-4189-b916-34393cf37407" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-billOfLading/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors" doc:id="05d04c41-810b-4262-a04b-bcf39afd11da" message="[billOfLading] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="e7cb19d2-3ad5-4309-8bef-a0f2b7a6f260" name="cf-invoke-notification-service"/>
+		</on-error-continue>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue " doc:id="d039b527-0b23-468a-885f-0db4fe85fb3e" type="ANY" >
+			<ee:transform doc:name="DW SET Payload Notification" doc:id="7f32590d-80d2-4b19-9e51-49e35cac6376" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-billOfLading/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Other Errors" doc:id="0dc7eb6a-f9ad-4502-9ca2-6c06591ed284" message="[billOfLading] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="fe5e1283-7106-42b4-8567-d16283818ccc" name="cf-invoke-notification-service" />
+		</on-error-continue>
+	</error-handler>
+</mule>

@@ -1,0 +1,124 @@
+{
+  "customsAcceptReject": {
+    "messageHeaders": {
+      "transactionSet": "355",
+      "senderId": "CUSTOMS",
+      "receiverId": "8CMC",
+      "gsDate": "2023-08-15T00:00:00+05:30",
+      "gsTime": 34140000,
+      "gsControlNmbr": 65767
+    },
+    "messageDetails": [
+      {
+        "messageCtrlNum": "65767",
+        "vesselScac": "CLAM",
+        "tranMethodCode": "O",
+        "countryCode": "AG",
+        "vesselCode": "9368998",
+        "vesselName": "PARADERO",
+        "voyageNumber": "D3031",
+        "manifestSeqNmbr": "UM-00004212",
+        "manifestTypeCode": "Y",
+        "vesselCodeQual": "L",
+        "manifestRefId": "051132",
+        "messageRemarks": [
+          
+        ],
+        "ports": [
+          {
+            "customsdistPortCode": "5203",
+            "estDateArrival": null,
+            "firmsCode": null,
+            "estArrivalTime": null,
+            "portRemarks": [
+              
+            ],
+            "acceptRejectDetails": [
+              {
+                "seqNbr": 1,
+                "amendmentDetails": [
+                  {
+                    "operatorScac": "CLAM",
+                    "dischargePort": "5203",
+                    "amendmentType": "D",
+                    "bolNumber": "STDN3M002801",
+                    "updateManifestQty": null,
+                    "amendmentCode": "03",
+                    "actionCode": null,
+                    "consolBolNumber": null,
+                    "bolIssuerScac": "CLAM",
+                    "amendmentRemarks": [
+                      {
+                        "remarks1": "fh",
+                        "remarks2": "040 B/L NOT ON FILE"
+                      },
+                      {
+                        "remarks1": "ftydttttttttt",
+                        "remarks2": "060 XXXX BILL REJECTED XXXX"
+                      }
+                    ]
+                  }
+                ],
+                "bolDetails": [
+                  {
+                          "bolNumber": "JAX0077",
+                          "portOfLading": "24741",
+                          "pieceCount": 5995,
+                          "pieceUom": "CAS",
+                          "weight": 54377,
+                          "weightUom": "L",
+                          "volume": 0,
+                          "volumeUom": "F",
+                          "bolTypeCd": "00",
+                          "precarrierPlaceReceipt": "SAN CRISTOBAL, DR",
+                          "bolIssuerScac": "CLAM",
+                          "secondaryNotifyScac1": null,
+                          "secondaryNotifyScac2": null,
+                          "lastPortOfLoading": null,
+                          "firstForeignPortOfPossession": null,
+                          "modeOfTransportation": null,
+                          "methodOfPayment": null,
+                          "bolRemarks": [
+                            {
+                              "remarks1": "ABCD",
+                              "remarks2": "058 ACCUM QTY NOT = BILL QTY"
+                            }
+                          ]
+                        }
+                ],
+                "references": [
+                  
+                ],
+                "parties": [
+                  
+                ],
+                "eventsDetails": [
+                  
+                ],
+                "equipmentDetails": [
+                  
+                ]
+              }
+            ]
+          }
+        ],
+        "countsDetails": {
+          "scac": "CLAM",
+          "transmissionDate": "230815",
+          "transmissionTime": "092915",
+          "ttlManifestsRead": "01",
+          "ttlPortsRead": "001",
+          "ttlBillsRead": "00001",
+          "ttlHouseBillsRead": "00000",
+          "ttlAmendmentsRead": "00002",
+          "ttlEvents": "00000",
+          "ttlBillsArrivalsRejected": "00000",
+          "ttlBillsArrivalsAccepted": "00001",
+          "ttlRecordsRead": "00050",
+          "recordFormatCd": null,
+          "countsUom": null
+        }
+      }
+    ]
+  }
+}

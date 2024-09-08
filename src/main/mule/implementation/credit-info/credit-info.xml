@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="mf-consume-kafka-event" doc:id="54de71fe-9117-4c17-a065-b7bfec105e66" initialState="${credit.initial.state}">
+ 		<kafka:message-listener doc:id="ca84971b-9998-4243-8ee9-235adcbb6c75" config-ref="Apache_Kafka_Consumer_configuration" doc:name="KAFKA Listener for Account Credit Topic">
+			<reconnect count="${credit.kafka.reconnection.attempts}" frequency="${credit.kafka.reconnection.frequency}"/>
+		</kafka:message-listener>
+		<set-payload value='#[output application/java&#10;---&#10;read(payload, "application/json")]' doc:name="DW Read Kafka event as JSON" doc:id="4c88e57a-dfee-4c4d-a0d2-87d254d4ef6f" />
+		<ee:transform doc:name="DW SET FV DocId, errorInfo" doc:id="502ea3b2-6a12-4efe-8025-2087c9c2dc8b">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="errorInfo" ><![CDATA[output application/java
+var errorString = "Unable to Process Account Credit Event Kafka Request "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+				<ee:set-variable variableName="docId" ><![CDATA[%dw 2.0 
+output application/json 
+--- 
+payload.eventData.docId]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG INFO Credit Info Flow [Start]" doc:id="b3aa432f-3c1d-4860-9fec-b2ed9c9e5446" message='[Credit-Info] Kafka Flow Starts for Doc Id :  #[vars.docId]'/>
+		<vm:publish doc:name="VM Publish - Credit Info " doc:id="ae39b99e-2d49-4261-8ccf-e08af6f92473" config-ref="common_vm-config" queueName="${vm.queueName.credit}" timeout="${vm.timeout}"/>
+		<error-handler ref="credit-info-common-error-handler" />
+	</flow>
+	<flow name="mf-credit-vm-consume" doc:id="8a965ac1-59a2-4d67-88d0-c3a87aa2d665">
+		<vm:listener queueName="${vm.queueName.credit}" doc:name="VM Listener - Credit Info " doc:id="4aec5b9a-5d5c-4626-96b1-24d5fc407691" config-ref="common_vm-config" timeout="${vm.timeout}" numberOfConsumers="${credit.vmConsumer}" />
+		<set-variable value="#[payload.eventData.docId]" doc:name="SET FV DocId from VM payload" doc:id="e03395b1-a4c5-45f0-b640-0d8b41d780f1" variableName="docId" />
+		<logger level="INFO" doc:name="LOG INFO VM Payload" doc:id="4c6ffcee-9e67-44f3-8564-af96bdcca813" message="[Credit-Info] Message Consumed for DocId : #[vars.docId]" />
+		<flow-ref doc:name="Refer to pf-select-db-credit-information" doc:id="a47b6b9a-814b-424b-bea7-0216514ef988" name="pf-select-db-credit-information" />
+	    <error-handler ref="credit-info-common-error-handler" />
+	</flow>
+	<flow name="pf-select-db-credit-information" doc:id="9ebbe816-fd6e-46d2-b439-ed323a4094e4">
+		<logger level="INFO" doc:name="LOG INFO Post Credit Account Flow [Start]" doc:id="bd27e537-1118-4c22-a4a2-4eed3b536422" message="[Credit-Info] Post Account Credit Info Flow Starts for DocId : #[vars.docId]" />
+		<ee:transform doc:name="DW  SET FV errorInfo" doc:id="ed97eab5-3e2b-4f07-983d-50cb5f9071d8">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="errorInfo"><![CDATA[output application/java
+var errorString = "Error occurred while fetching credit records from Database "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:name="DB SQL Select XML Records" doc:id="ad3d3a9f-717d-4087-abcd-1032fa6902c1" config-ref="common_database_object_store-configuration">
+			<db:sql><![CDATA[#["${credit.sql.selectQuery}"]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{'docId' : vars.docId}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="DW SET DB Payload" doc:id="d107c565-0833-4678-849a-63d84929d048">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+if (not isEmpty(payload))
+    read(payload.Value[0],"application/xml").DATA_DS.*G_1
+else []]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#[sizeOf(payload) default 0]" doc:name="SET FV inputReqSize" doc:id="d3916d80-1cba-4fc7-8ecb-9ff734c034de" variableName="inputReqSize"/>
+		<logger level="INFO" doc:name="LOG INFO Total Record Count" doc:id="07d113fa-73ee-40d7-b1a3-e931db5178c1" message="[Credit-Info] Total Record Count for DocId #[vars.docId] : #[vars.inputReqSize]" />
+		<choice doc:name="CHECK IF Records exists in DB for DocId" doc:id="5dd663b3-976c-4768-88b4-366dd366fc07">
+			<when expression="#[vars.inputReqSize &gt; 0]">
+				<flow-ref doc:name="Refer to sf-query-parties-salesforce" doc:id="115b02e9-9e91-4919-9aa6-877025abe281" name="sf-query-parties-salesforce"/>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="LOG INFO No Records Found in DB" doc:id="be95209f-1462-47e6-b3c0-2077010996fa" message="[Credit-Info] No records found in DB to process for DocId #[vars.docId]" />
+			</otherwise>
+		</choice>
+		<error-handler ref="credit-info-common-error-handler" />
+	</flow>
+	<sub-flow name="sf-query-parties-salesforce" doc:id="3625da94-4e87-475a-910e-be95b667be5e" >
+		<ee:transform doc:name="DW  SET FV errorInfo" doc:id="949f8119-4e8c-4045-9c72-4136e5649940">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="errorInfo"><![CDATA[output application/java
+var errorString = "Error occurred while fetching PartyIDs present in Salesforce "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+		<foreach doc:name="For Each 5000 Account PartyIds - Query SF" doc:id="c953e6b4-dd59-4701-b733-17b7fc5df2a9" collection="#[payload]" batchSize="${credit.batchsize}">
+					<ee:transform doc:name="DW SET SF Query Variable" doc:id="cf446e86-a2b6-4258-b1dc-97d8189d5cd8">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="sfQuery"><![CDATA[%dw 2.0
+output application/java
+---
+p('credit.sfQuery') ++  ("(" ++ ((payload map ("'" ++ ($.PARTY_ID default "") ++ "'")) joinBy ",") ++ ")")]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<salesforce:query doc:name="SF Query to Check PartyIds" doc:id="6c00eed3-42ca-4453-b3eb-9206747c1991" config-ref="common_salesforce-configuration">
+						<ee:repeatable-file-store-iterable inMemoryObjects="2000" />
+						<salesforce:salesforce-query><![CDATA[#[vars.sfQuery]]]></salesforce:salesforce-query>
+					</salesforce:query>
+			<ee:transform doc:name="DW SET sfResponse var" doc:id="c19598fb-e37a-47b2-b8e3-1f3f4d71afb2">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable resource="dwl/credit-info/v-credit-sf-query-response.dwl" variableName="sfResponse" />
+						</ee:variables>
+					</ee:transform>
+				</foreach>
+		<logger level="INFO" doc:name="LOG INFO After SF Query" doc:id="f5941882-71d8-47a2-8489-55d39e3c460d" message="[Credit-Info] After SF Query to Fetch Existing Party Ids for DocId : #[ vars.docId]"/>
+		<ee:transform doc:name="DW SET FV noacc" doc:id="2a2383ca-4ec6-48ad-9f6c-f0b0deac896c">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="noacc"><![CDATA[%dw 2.0
+output application/java
+---
+(payload.PARTY_ID default []) -- (vars.sfResponse.CDM_Org_Id__c default [])]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+		<choice doc:name="CHECK IF Records Exists for Case Creation" doc:id="6645c9d8-ee93-42ce-92c4-888aa2fd78d9">
+			<when expression="#[vars.noacc != []]">
+				<async doc:name="Async" doc:id="e3b0bca4-bb0d-4962-9ff1-4adc6a756053">
+					<flow-ref doc:name="Refer to mf-credit-case-creation" doc:id="736b7f69-7e84-426b-b6c1-5d423e4bc6a1" name="mf-credit-case-creation" />
+				</async>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="LOG INFO No Case Creation Records" doc:id="61975cd3-963f-4fd7-860c-786ecafcbd52" message="No Credit Records for Case Creation. DocId : #[ vars.docId]" />
+			</otherwise>
+		</choice>
+		<remove-variable doc:name="REMOVE FV noacc" doc:id="822d2e59-bf4c-4159-8b7b-d810af3549ad" variableName="noacc" />
+		<choice doc:name="CHECK IF Party Id Exists in SF" doc:id="a375bbd4-54a9-4d47-ab49-314e35b5e7be">
+					<when expression="#[vars.sfResponse !=[]]">
+						<ee:transform doc:name="DW  SET FV errorInfo" doc:id="57a775b2-57b4-4a78-bb06-e4007b63ffd6">
+							<ee:message />
+							<ee:variables>
+								<ee:set-variable variableName="errorInfo"><![CDATA[output application/java
+var errorString = "Error occurred while creating Account credit request for Salesforce "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<ee:transform doc:name="DW Map Payload with Credit Information" doc:id="f5482ce3-11d4-4e1f-9de9-b0cc2141f761">
+							<ee:message>
+						<ee:set-payload resource="dwl/credit-info/p-credit-account-sf-request.dwl" />
+							</ee:message>
+						</ee:transform>
+						<remove-variable doc:name="REMOVE FV sfResponse" doc:id="ad4fd7a3-5c44-4ba5-88ff-a994a04afea2" variableName="sfResponse" />
+						<remove-variable doc:name="REMOVE FV sfQuery" doc:id="34b38324-4c76-47f4-a7b8-996ba8c9ab8c" variableName="sfQuery" />
+						<flow-ref doc:name="Refer to pf-update-account-credit-infomation" doc:id="09be803e-e8e2-4789-a2a1-a7eeb74eed18" name="pf-update-account-credit-infomation" />
+					</when>
+					<otherwise>
+						<logger level="INFO" doc:name="LOG INFO PartyId not Found" doc:id="2ade6fee-cbe3-4ca0-812a-f639c0151774" message="[Credit-Info] No PartyIds Found in Salesforce for DocId #[vars.docId]" />
+					</otherwise>
+				</choice>
+		<logger level="INFO" doc:name="LOG INFO Post Credit Account Flow [End]" doc:id="e3e64f86-fcf8-4288-b09a-340b320970e8" message="[Credit-Info] Post Account Credit Info Flow Ends for DocId : #[ vars.docId]" />
+	</sub-flow>
+	<flow name="pf-update-account-credit-infomation" doc:id="0a9c6866-84f8-4405-8579-162e77fed527">
+		<ee:transform doc:name="DW SET FV sfUpdateResponse as Empty Array,sfUpdatePayload , errorInfo" doc:id="4462a280-07f4-4788-9d5f-bf25d8d16d41">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="sfUpdateResponse" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="sfUpdatePayload" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="errorInfo" ><![CDATA[output application/java
+var errorString = "Salesforce Update Request for Account Credit Information failed "
+---
+ShortDescription : errorString]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each 200 Credit Records -Call SF Update" doc:id="f3de0369-726b-4952-b6cb-6321dc376df2" collection="#[payload]" batchSize="${credit.update.batchSize}">
+			<ee:transform doc:name="DW SET SF Update Request" doc:id="882b573c-956e-4681-9d72-3044c2350cba">
+			<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ((item, index) ->
+(item) - 'Party_Id' ++ ("fieldsToNull": ((item filterObject ($ == "")) pluck $$)) if (valuesOf(item) contains ""))]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+			<salesforce:update doc:name="Update Account Credit Info in SF" doc:id="dccc0dc4-ba70-4a28-b34c-00afe0b0e2e9" config-ref="common_salesforce-configuration" type="Account" />
+			<ee:transform doc:name="DW SET FV accumlated updateResponse" doc:id="2ab931a0-4157-481e-a709-b283e4bfa366">
+				<ee:message />
+				<ee:variables>
+						<ee:set-variable variableName="sfUpdateResponse"><![CDATA[%dw 2.0
+output application/java
+---
+vars.sfUpdateResponse ++ (payload.items.payload default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<logger level="INFO" doc:name="LOG INFO After SF Update" doc:id="39d98f6c-fe16-4775-9ca0-082107298dff" message="[Credit-Info] After SF Update Request for all Credit Records for DocId : #[ vars.docId]"/>
+		<logger level="DEBUG" doc:name="LOG DEBUG Salesforce Final Response" doc:id="853c781e-3c3a-4d7e-a5f4-2f5e24cf13f2" message="{credit-Info] Final Response after inserting all credit records into Salesforce : #[vars.sfUpdateResponse] for DocId : #[vars.docId]" category="com.crowley.sf.inbound.credit.info" />
+		<ee:transform doc:name="DW SET FV errorInfo" doc:id="5f6e9b7b-a0fe-4ea3-b42d-2987f0aa553f">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="errorInfo"><![CDATA[output application/java
+var errorString = "Failed to update Retrieval Status in Database "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:update doc:name="DB SQL Update RetrievalStatus" doc:id="b731724f-b083-440d-a584-7922d574f612" config-ref="common_database_object_store-configuration">
+			<db:sql><![CDATA[#["${credit.sql.updateQuery}"]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{'docId' : vars.docId}]]]></db:input-parameters>
+		</db:update>
+		<logger level="INFO" doc:name="LOG INFO Status Updated in DB" doc:id="ab1b84fa-69cb-417c-b584-45e19c1811db" message="[Credit-Info] Retrieval Status Updated Succesfully in DB for Doc Id : #[ vars.docId]" />
+		<flow-ref doc:name="Rerer to sf-send-account-credit-errors" doc:id="b807fcd7-f0b8-4146-a13e-23da1a053eb1" name="sf-send-account-credit-errors" />
+		<error-handler ref="credit-info-common-error-handler" />
+	</flow>
+	<sub-flow name="sf-send-account-credit-errors" doc:id="96cb4eff-321d-4938-869a-bda17b44afc9" >
+		<ee:transform doc:name="DW SET FV size of total,failed and success records, errorInfo" doc:id="033a9323-5832-4749-9dab-9481573ba13d">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="errorInfo" ><![CDATA[output application/java
+var errorString = "Error Occurred while processing Salesforce-Update Response Summary "
+---
+ShortDescription : errorString
+]]></ee:set-variable>
+				<ee:set-variable resource="dwl/credit-info/v-credit-sf-update-summary.dwl" variableName="sfUpdateSummary" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="INFO LOG Number of Success and Failure Records in File" doc:id="9743d874-d97f-478b-adc4-2866579b82e1" message="[Credit-Info] Account Credit Total Records for SF Update : #[vars.sfUpdateSummary.totalRecords] Success Records : #[vars.sfUpdateSummary.successRecords] and Failure Records : #[vars.sfUpdateSummary.failedRecords] for DocId : #[vars.docId]" />
+		<ee:transform doc:name="DW SET PL Summary Count" doc:id="a880fdda-6b70-43d9-b098-4b6cd8dd0118">
+			<ee:message>
+				<ee:set-payload resource="dwl/credit-info/p-notification-credit-sf-update-summary.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="4f93590d-ab4a-479f-8ec7-3a5079900265" name="cf-invoke-notification-service" />
+		<ee:transform doc:name="DW SET Payload as SF Error Response" doc:id="e9c518d1-81b1-492f-96e3-c947ef00ff75" >
+			<ee:message >
+				<ee:set-payload resource="dwl/credit-info/p-credit-sf-update-response.dwl" />
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="CHECK IF Any Error Records Exists" doc:id="df333e0f-c099-4e42-bc9a-98f9527aeae3" >
+			<when expression="#[payload.errorResponse != []]">
+				<foreach doc:name="For Each Error Record - Call Notification Service" doc:id="644c8b95-2bcc-4d3d-bb10-5e4508e05e5d" collection="#[payload.errorResponse]" batchSize="${credit.update.error.batchSize}">
+					<ee:transform doc:name="DW Set Error Details" doc:id="17919a10-09f9-48fb-a659-c06650738bc9">
+						<ee:message>
+							<ee:set-payload resource="dwl/credit-info/p-notification-credit-sf-update-error.dwl" />
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="bed0b350-9f76-4692-8972-f612e56bc4bd" name="cf-invoke-notification-service" />
+				</foreach>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG INFO Credit Information Successfully updated" doc:id="229ca96e-9270-4cf4-bbe5-e6c279030c53" message="[Credit-Info] Credit Information Successfully updated for DocId : #[ vars.docId]" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+</mule>

@@ -1,0 +1,28 @@
+{
+  "compositeResponse": [
+    {
+      "body": {
+        "totalSize": 1,
+        "done": true,
+        "records": [
+          {
+            "attributes": {
+              "type": "Manifest_BOL_Link__c",
+              "url": "/services/data/v51.0/sobjects/Manifest_BOL_Link__c/a3b8D000000MqXZQA0"
+            },
+            "Id": "a3b8D000000MqXZQA0"
+          }
+        ]
+      },
+      "httpHeaders": {},
+      "httpStatusCode": 200,
+      "referenceId": "manifestId_0"
+    },
+    {
+      "body": null,
+      "httpHeaders": {},
+      "httpStatusCode": 204,
+      "referenceId": "refContentDocumentLink"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="cdm-sf-sync-error-handler" doc:id="f74235fe-d586-46a4-be8a-a66a652016fb" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="45dfe9f0-9855-425a-b3c0-8c51b115db27" type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED">
+			<logger level="ERROR" doc:name="LOG ERROR" doc:id="0fd6c9b5-b00e-4c0e-a53f-e92861a957bb" message="[CDM-SF-Sync] Error syncing data from CDM to SF due to #[error.detailedDescription] for DocId #[vars.docId]"/>
+			<ee:transform doc:name="DW to Set Error Message For Support Ticket" doc:id="dd3b2068-ff86-46e9-95e0-03c35b54a27b" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"errorMessage" :  (error.cause.message default "Unable to update Accounts, Business Locations and contacts information in Salesforce")
+	 ++ " for DocId : " ++ correlationId ++ " due to : " ++  (error.detailedDescription default "No information available"), 
+	"requestorResource" : "CDM to SF Sync",
+	"statusCode" : "500",
+	"impact" : "2",
+	"urgency": "1",
+	"assignmentGroup" : "Service Platform",
+	"shortDescription": error.description
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="b33502aa-ce34-4b5f-908c-c0b08d4342c3" name="cf-invoke-support-ticket-service"/>
+			<ee:transform doc:name="DW to Set Error Message for Notificaton Service" doc:id="da41a176-ecd4-4896-b091-7408c5f13266" >
+				<ee:message >
+					<ee:set-payload resource="dwl/cdm-sf-sync/p-common-error.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="770d9e5d-4e0a-467e-b7dc-9a5dd1b285e3" name="cf-invoke-notification-service"/>
+		</on-error-continue>
+
+	<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="92b1336f-943d-471c-b8ef-28cb47751d8f" type="ANY">
+			<logger level="ERROR" doc:name="LOG ERROR" doc:id="7cb1c9bd-5b79-4ab6-aefa-33555cfba0a8" message="[CDM-SF-Sync] Error syncing data from CDM to SF due to #[error.detailedDescription] for DocId #[correlationId]" />
+			<ee:transform doc:name="DW to Set Error Message for Notificaton Service" doc:id="1099efd8-112c-4f76-bcfe-87ea86a7750f">
+				<ee:message>
+					<ee:set-payload resource="dwl/cdm-sf-sync/p-common-error.dwl" />
+				
+</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="dbc205ad-554d-4c9f-aafb-02bec35bae09" name="cf-invoke-notification-service" />
+
+		</on-error-continue>
+	</error-handler>
+	<sub-flow name="business-locations-mandatory-fields-missing" doc:id="07a1b3ab-6dbc-4f97-a407-bad8d79daa24" >
+		<logger level="INFO" doc:name="LOG INFO Missing Fields" doc:id="9130ddf7-9432-4f60-89a1-83561220724f" message="**********Mandatory fields are missing for Business Locations********* " />
+			<ee:transform doc:name="DW to Set Error Message" doc:id="eeee948c-cab4-4591-ad4d-d0d22292a7d2">
+				<ee:message>
+				<ee:set-payload resource="dwl/cdm-sf-sync/p-business-locations-missing-fields-error.dwl" />
+				
+</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="78dd16d8-42c5-4014-ae41-80a34b34f805" name="cf-invoke-notification-service" />
+	</sub-flow>
+</mule>

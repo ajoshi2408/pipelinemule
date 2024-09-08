@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="cf-common-salesforce-composite" doc:id="97651838-d8b4-4735-82b6-23d76ea25f99" >
+		<logger level="INFO" doc:name="LOG INFO Composite Enter Message" doc:id="03e18f17-1c00-4da2-a55b-3b107e2499df" message="Composite Request Flow Started"/>
+		<salesforce-composite:execute-composite-request doc:name="SF Execute composite request" doc:id="fd862039-d3d1-40d4-8eef-12b70eb6380e" config-ref="common_salesforce_composite-configuration" />
+		<logger level="INFO" doc:name="LOG INFO Composite End Message" doc:id="cfead79a-17f3-4e7d-9db3-6ed5b0e880af" message="Composite Request Flow End"/>
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-composite-graph" doc:id="58b87479-8e05-439d-af6d-4852ae5ac713" >
+		<logger level="INFO" doc:name="LOG INFO Composite Started" doc:id="aa318fa1-9c49-4403-937a-421ccab3eaa4" message='#[flow.name ++ " Started"]' />
+		<salesforce-composite:execute-composite-graph doc:name="SF Execute composite graph request" doc:id="4b5e5a46-faff-49f3-b9e5-3a08968bb389" config-ref="common_salesforce_composite-configuration"/>
+		<logger level="INFO" doc:name="LOG INFO Composite Ended" doc:id="0dcdbdf4-4944-4981-b67c-60d87e2f7a8e" message='#[flow.name ++ " Ended"]' />
+	</sub-flow>
+	<sub-flow name="cf-cdm-sync-salesforce-upsert" doc:id="84dbfaab-3ac1-459e-8011-ba4dc32fe79a" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="334139bd-df39-464d-8b58-ce1578231094" message="Salesforce upsert started for flow : #[vars.varSFUpsert.flowName]"/>
+		<salesforce:upsert doc:name="SF Upsert" doc:id="e48e411c-aae1-4109-82e9-4dd7e557e4f5" config-ref="cdm_salesforce_configuration" objectType="#[vars.varSFUpsert.objectType]" externalIdFieldName="#[vars.varSFUpsert.externalId]">
+			<salesforce:records ><![CDATA[#[vars.varSFUpsert.salesforcePayload]]]></salesforce:records>
+		</salesforce:upsert>
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="111ee2e0-4855-4145-9cfc-bde03071c25f" message="Salesforce Upsert completed for flow : #[vars.varSFUpsert.flowName]"/>
+	</sub-flow>
+	<sub-flow name="cf-cdm-sync-salesforce-query" doc:id="45abc277-3f97-4923-bf69-1c677e8e9d58" >
+		<salesforce:query doc:name="Salesforce Query" doc:id="a35ff991-0416-4b89-b9ab-d96af3a7158d" config-ref="cdm_salesforce_configuration">
+			<salesforce:salesforce-query><![CDATA[#[vars.varQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-upsert" doc:id="89380113-ef94-424d-9933-79bfa1ee9164" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="f5a78b0a-eaf6-46e9-bb71-80db61a7cd5b" message="START : Salesforce Update Flow"/>
+		<salesforce:upsert doc:name="SF Upsert" doc:id="3e3207fc-1588-48aa-ba53-acf7e2a4f830" config-ref="common_salesforce-configuration" objectType="#[payload.objectType]" externalIdFieldName="#[payload.externalId]">
+			<salesforce:records ><![CDATA[#[payload.salesforcePayload]]]></salesforce:records>
+		</salesforce:upsert>
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="d2ec2c6a-ee8a-4ed5-b788-a4a255172701" message="END : Salesforce Update Flow"/>
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-query" doc:id="755197f9-785f-419c-89d2-e756abf3221a" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="9cbc345e-d50e-4e77-8f2c-627f99c9b1d7" message="START : Salesforce Query Flow" />
+		<salesforce:query doc:name="Salesforce Query" doc:id="d8ebe756-df40-4ad0-bdbc-642e82b46db4" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query><![CDATA[#[vars.varQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="3a0bb6bf-02f9-4f3b-b946-e3e4b3d339ef" message="END : Salesforce Query Flow" />
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-delete" doc:id="2fb25ac2-a9bc-4670-840d-e67fe3ff94ce" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="ac0e80ef-dd05-4bf8-8d0a-7562a59e1bd6" message="START : Salesforce Delete Flow"/>
+		<salesforce:delete doc:name="SF - Delete" doc:id="473c3a5f-66c4-43cf-baac-8c36979ad6a1" config-ref="common_salesforce-configuration" />
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="a9521d71-89b0-40f6-b271-f975567710bf" message="END : Salesforce Delete Flow"/>
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-update" doc:id="ec216360-8ee9-4eff-88ff-f4bf214c22ec" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="d4be22b4-b484-4058-a778-1cd9ad0c0ed1" message="START : Salesforce Update Flow" />
+		<salesforce:update doc:name="SF - Update" doc:id="621ce9ad-6de1-4d17-b95b-88d4c4cde9ac" config-ref="common_salesforce-configuration" type="#[payload.objectType]">
+			<salesforce:records ><![CDATA[#[payload.records]]]></salesforce:records>
+		</salesforce:update>
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="7543de3f-e2f9-4b49-b1c3-a9ce1d36942e" message="END : Salesforce Update Flow" />
+	</sub-flow>
+	<sub-flow name="cf-common-salesforce-create" doc:id="ba2af9e3-f516-4206-9240-839d0eb11c49" >
+		<logger level="INFO" doc:name="LOG INFO Flow Started" doc:id="24dd7330-1a45-4888-b59f-614acb086081" message="START : Salesforce Update Flow" />
+		<salesforce:create doc:name="SF - Create" doc:id="096bc798-15ce-4225-9b7b-d9fc7f456628" config-ref="common_salesforce-configuration" type="#[payload.objectType]">
+			<salesforce:records ><![CDATA[#[payload.records]]]></salesforce:records>
+		</salesforce:create>
+		<logger level="INFO" doc:name="LOG INFO Flow Ended" doc:id="204aa664-f6d8-487e-9286-c32742d03fda" message="END : Salesforce Update Flow" />
+	</sub-flow>
+</mule>

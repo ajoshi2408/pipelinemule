@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:support-ticket-system-service="http://www.mulesoft.org/schema/mule/support-ticket-system-service"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/support-ticket-system-service http://www.mulesoft.org/schema/mule/support-ticket-system-service/current/mule-support-ticket-system-service.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="cf-invoke-support-ticket-service"
+		doc:id="7770a684-6d03-4bb0-a2b8-e4c492fba675">
+		<set-variable value="#[payload.emailTemplateConfigStoreKey]" doc:name="FV emailTemplateConfigStoreKey" doc:id="6e3822e5-5a2e-49d9-8db7-686a1ad4e3d5" variableName="emailTemplateConfigStoreKey"/>
+		<ee:transform doc:name="DW Set Support Ticket Payload"
+			doc:id="1f9ac0af-27f5-4207-a10f-545b563348dd">
+			<ee:message>
+				<ee:set-payload resource="dwl/c-support-ticket-template.dwl" />
+			
+</ee:message>
+		</ee:transform>
+		<http:request method="POST"
+			doc:name="[POST]Invoke Support Ticket Service"
+			doc:id="1d2d68e8-89fc-41d6-97d8-8abb3983b342"
+			config-ref="common_support_ticket_http-requestor-configuration"
+			path="${support-system-service.path}" responseTimeout="#[Mule::p('support-system-service.responseTimeOut')]"/>
+		<error-handler>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="3a6ccb7c-c9be-46d1-a42d-4b191c43f9d9" type="ANY">
+				<ee:transform doc:name="DW PAYLOAD Set Error Details" doc:id="1d69496a-ec23-4f29-a2db-e710f4590f9c">
+					<ee:message>
+						<ee:set-payload resource="dwl/c-support-ticket-failure-global-error.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="ERROR" doc:name="LOG ERROR Message cause" doc:id="5d211b43-5dd9-4e47-9a1e-0d0d01504a19" message="Error occured while raising support ticket | Error Message  : #[payload.errorMessage] | Cause : #[payload.cause]" />
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="b64b7042-fa30-48ff-b060-954ff14779d2" name="cf-invoke-notification-service" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+
+	<flow name="cf-invoke-notification-service"
+		doc:id="b8930829-40e6-401a-9eb4-0336b85afa0d">
+		<choice doc:name="Check emailTemplateConfigStoreKey not empty" doc:id="2877df40-8881-4656-80a7-52f79c6c04fd" >
+			<when expression="#[!isEmpty(payload.emailTemplateConfigStoreKey)]">
+				<flow-ref doc:name="Refer to cf-get-email-template" doc:id="62a6be08-0a8d-432a-b33f-a280136f99c1" name="cf-get-email-template" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="LOG Email Template Key Not available" doc:id="562704fe-5976-4638-985f-2760d7dbf8af" message="emailTemplateConfigStoreKey value not available"/>
+			</otherwise>
+		</choice>
+		<http:request method="POST" doc:name="[POST]Invoke Notification System Service" 
+		doc:id="c5727e90-cdfa-42d9-9e24-3f4b8d6fbf3f" 
+		config-ref="common_notification_service_https-requestor-configuration" 
+		path="${notification-system-service.path}" responseTimeout="#[Mule::p('notification-system-service.responseTimeOut')]">
+			<http:query-params><![CDATA[#[{
+	"async" : Mule::p('notification-system-service.asyncValue')
+}]]]></http:query-params>
+
+		</http:request>
+		<error-handler>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="5d5a914a-df1f-4476-b3af-64e8a29d3598" type="ANY">
+				<ee:transform doc:name="DW Set Response payload" doc:id="1cfda17c-b2d9-449c-9cc3-a5af76ad241c">
+					<ee:message>
+						<ee:set-payload resource="dwl/c-notification-failure-global-error.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="ERROR" doc:name="LOG ERROR Notification Error Cause" doc:id="6c1c0c36-5dff-453f-9d80-a4df02de66e0" message="Error occured while raising email notification #[payload]" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<sub-flow name="cf-get-email-template"
+		doc:id="89538018-d3e9-4eec-86a4-be1188604c87">
+		<set-variable
+			value='#[payload.emailTemplateConfigStoreKey]'
+			doc:name="FV SET emailTemplateConfigStoreKey"
+			doc:id="c912b2ce-5217-4cde-a57e-dca6851a9ec1"
+			mimeType="application/json"
+			variableName="emailTemplateConfigStoreKey" />
+		<db:select
+			doc:name="DB Select emailTemplateConfigStoreDocument"
+			doc:id="1dc17c8a-c91d-446d-9c28-e868f3732ca0"
+			config-ref="common_database_object_store-configuration"
+			target="notificationTemplate"
+			targetValue="#[read(payload[0].Value as String,'application/json')]">
+			<db:sql><![CDATA[#["SELECT Value FROM ${sql.table} where [key] = :key"]]]></db:sql>
+			<db:input-parameters><![CDATA[#[{'key' : vars.emailTemplateConfigStoreKey}]]]></db:input-parameters>
+		</db:select>
+		<validation:is-false
+			doc:name="VALIDATE whether database response is empty or not"
+			doc:id="626382aa-696e-4a11-9c53-839e9e714aa9"
+			expression="#[vars.notificationTemplate == null]"
+			message="#['Data not found for emailTemplateConfigStoreKey = ' ++ vars.emailTemplateConfigStoreKey]" />
+		<ee:transform doc:name="DW PAYLOAD Build Email Format"
+			doc:id="a0af8132-c0d3-40b5-b539-01199856cfa8">
+			<ee:message>
+				<ee:set-payload resource="dwl/c-notification-template.dwl" />
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+</mule>
+	

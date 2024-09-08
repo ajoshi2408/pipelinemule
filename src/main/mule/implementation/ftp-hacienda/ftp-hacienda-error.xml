@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<error-handler name="hacienda-common-error-handler" doc:id="43a829b4-3643-4b2d-b6db-53a53d475e39" >
+	<on-error-propagate enableNotifications="true"
+				logException="true" doc:name="On Error Propagate"
+				doc:id="7c9087c1-d648-4512-885c-d24f58eb15be"
+				type="SALESFORCE:CONNECTIVITY, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE-COMPOSITE:CONNECTIVITY">
+				<ee:transform doc:name="DW PAYLOAD Set Error Details"
+					doc:id="6aef81e9-4a63-442b-89e6-d2d4dd28b444">
+					<ee:message>
+					<ee:set-payload resource="dwl/hacienda-files/p-salesforce-error-support-ticket.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-support-ticket-service"
+					doc:id="344ea3c4-6422-473f-8c5d-d4406325e80e"
+					name="cf-invoke-support-ticket-service" />
+			<flow-ref doc:name="Refer to sf-ftp-common-error-handler" doc:id="ff3cf1f5-7d1c-46ce-872f-30668297b115" name="sf-ftp-common-error-handler" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="23217345-266a-4b10-a7ed-13e3fda93202" type="FTP:ACCESS_DENIED, FTP:CONNECTIVITY, FTP:FILE_ALREADY_EXISTS, FTP:FILE_LOCK, FTP:ILLEGAL_CONTENT, FTP:ILLEGAL_PATH, FTP:RETRY_EXHAUSTED">
+			<flow-ref doc:name="Refer to sf-ftp-error-handler" doc:id="c2ff09bf-9ce2-4559-a4dd-30c68b0337ed" name="sf-ftp-error-handler" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true"
+				logException="true" doc:name="On Error Propagate"
+				doc:id="1a46e767-d76f-43ee-8193-cde9e47c3698" type="ANY">
+				<ee:transform doc:name="DW PAYLOAD Set Error Details"
+					doc:id="393d2bbd-6e9a-4196-98cf-703efce8cf29">
+					<ee:message>
+					<ee:set-payload resource="dwl/hacienda-files/p-any-error-notification.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service"
+					doc:id="17e4bcff-4db5-455d-bd1a-397928301340"
+					name="cf-invoke-notification-service" />
+			<flow-ref doc:name="Refer to sf-ftp-common-error-handler" doc:id="5b81c41e-0fd5-4049-99a7-c1bbece6b5a4" name="sf-ftp-common-error-handler" />
+			</on-error-propagate>
+</error-handler>
+	<sub-flow name="sf-ftp-error-handler" doc:id="aaeb79e9-3e18-4ead-9fbf-84f324d5fd9c" >
+		<logger level="ERROR" doc:name="LOG ERROR Message with Filename" doc:id="bfbe0368-17fe-446c-b6c6-8c99298e0e48" message='HACIENDA: Error Occured while sending file : #[vars.haciendaFileName] to #[vars.errorAtFTPFolder] due to : #[error.cause]' />
+		<ee:transform doc:name="DW PAYLOAD Set Error Details for Notification Service" doc:id="d4d60b42-788c-4cbe-816b-6205a89f74ee">
+					<ee:message>
+					<ee:set-payload resource="dwl/hacienda-files/p-ftp-error-notification.dwl" />
+					
+</ee:message>
+				</ee:transform>
+		<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="fab595c4-c5d8-46cc-bb25-230a08f57bc3" name="cf-invoke-notification-service" />
+		<ee:transform doc:name="DW PAYLOAD Set Error Details for Support Ticket Service" doc:id="d251bdb3-2259-4228-807a-2417e30e4897">
+					<ee:message>
+						<ee:set-payload resource="dwl/hacienda-files/p-ftp-error-support-ticket.dwl" />
+					</ee:message>
+				</ee:transform>
+		<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="48bef6b1-7738-49df-aada-4cecbe5a9a01" name="cf-invoke-support-ticket-service" />
+	</sub-flow>
+	<sub-flow name="sf-ftp-common-error-handler" doc:id="ccb8e61c-b195-412f-b51f-218d318e2613">
+		<try doc:name="Try" doc:id="ec87de6e-c8ce-4d06-9d99-e8c3fc945b70">
+				<flow-ref doc:name="Refer to sf-hacienda-ftp-error-folder" doc:id="0a91dcef-3346-41e2-967f-25ab0c7f4308" name="sf-hacienda-ftp-error-folder" />
+				<error-handler>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="3dd2ce73-d0b2-4e11-b4d5-4e51ed0ac611" type="ANY">
+						<flow-ref doc:name="Refer to sf-ftp-error-handler" doc:id="73e51995-665d-4f62-9ac1-5292a0cb7107" name="sf-ftp-error-handler" />
+					</on-error-propagate>
+				</error-handler>
+			</try>
+	</sub-flow>
+</mule>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<error-handler
+		name="payment-receipts-common-error-handler"
+		doc:id="694a1cf5-e83c-40d9-8745-af308834d0b5">
+		<on-error-continue enableNotifications="true"
+			logException="true"
+			doc:name="On Error Continue - Connectivity Errors"
+			doc:id="96d71867-16b0-4934-aca4-f036924bb13b"
+			type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED">
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors"
+				doc:id="bca364dd-73c0-40e6-b729-16c0f2d11b63"
+				message="[payment-receipts] errorType : #[error.errorType.asString default ''] | failingComponent : #[error.failingComponent default ''] | description : #[error.description default '']" />
+			<ee:transform doc:name="DW SET Payload Support Ticket"
+				doc:id="d30ab0b1-62e4-444f-97ff-81f1cc2274d7">
+				<ee:message>
+					<ee:set-payload
+						resource="dwl/payment-receipts/p-support-ticket-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref
+				doc:name="Refer to cf-invoke-support-ticket-service"
+				doc:id="fe4196f4-0deb-4e79-ba53-6fe658118e6b"
+				name="cf-invoke-support-ticket-service" />
+			<ee:transform doc:name="DW SET Payload Notification"
+				doc:id="c3722c2f-3d11-47b2-b462-49e7a461427e">
+				<ee:message>
+					<ee:set-payload
+						resource="dwl/payment-receipts/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service"
+				doc:id="0e2fe4fc-35aa-4b49-b6e3-fe0c10f79b9c"
+				name="cf-invoke-notification-service" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="true"
+			logException="true" doc:name="On Error Continue "
+			doc:id="009d175e-18ce-42b3-8166-2ef216b1d51a" type="ANY">
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors"
+				doc:id="2f652dfc-5913-4a66-b786-4bed6dca6376"
+				message="[payment-receipts] errorType : #[error.errorType.asString default ''] | failingComponent : #[error.failingComponent default ''] | description : #[error.description default '']" />
+			<ee:transform doc:name="DW SET Payload Notification"
+				doc:id="ad7d21c4-8a89-46bc-8dfb-7f3352a0a2f5">
+				<ee:message>
+					<ee:set-payload
+						resource="dwl/payment-receipts/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service"
+				doc:id="b3604d32-837a-43fd-b90d-8e2409a744ae"
+				name="cf-invoke-notification-service" />
+		</on-error-continue>
+	</error-handler>
+</mule>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="mf-tmw990-kafka-listener" doc:id="4039ff84-6a3e-4fcc-87f3-46486d5d5f2b" >
+		<kafka:message-listener doc:name="tmw990-events" doc:id="274b8127-091e-4dca-a03b-c7769c3a327b" config-ref="tmw990KafkaConsumerConfig">
+			<reconnect frequency="${tmw990.kafka.reconnection.frequency}" count="${tmw990.kafka.reconnection.attempts}"/>
+		</kafka:message-listener>
+		<logger level="INFO" doc:name="Tmw990 Event Flow Started" doc:id="59337541-f383-4623-a7b8-7e075ff78c9d" message="TMW 990 event flow started"/>
+		<vm:publish queueName="tmw990-async-vm-queue" doc:name="Publish to tmw990-async-vm-queue" doc:id="5cd7935e-7593-481e-a4cb-b7c7d955ad47" config-ref="TMW990vmConfig"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="b2dde936-92c5-470b-af5a-9ca1b0a79b5c" >
+				<ee:transform doc:name="Support Ticket Payload" doc:id="78c1f815-2f6b-401d-9ef7-01be34d49453" >
+					<ee:message >
+						<ee:set-payload resource="dwl/tmw990/p-set-support-payload.dwl" />
+					</ee:message>
+					<ee:variables >
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="LOG ERROR Message" doc:id="401dbfdd-aa43-444c-bca0-d065ff9e1e91" message='"Error:" payload.errorMessage'/>
+				<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="324d2f04-dcd5-459a-a60c-984810b63100" name="cf-invoke-support-ticket-service"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="mf-tmw990-VM-listener" doc:id="2c674616-4f1c-4c8b-82aa-a8d9cd431900" >
+		<vm:listener doc:name="Listen from tmw990-async-vm-queue" doc:id="e8b56b1b-3faa-4d1c-806d-f18b5596b634" config-ref="TMW990vmConfig" queueName="tmw990-async-vm-queue"/>
+		<ee:transform doc:name='Read Payload' doc:id="8a1bd8df-9f97-4844-aebb-83bc386c798f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+read(payload, "application/json")]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG request received from VM" doc:id="9df70b77-3b69-4fa0-9714-eea6867f6d8a" message="TMW990 booking response event flow started with eventId: #[payload.eventContext.eventId]"/>
+		<set-variable value="#[payload.eventContext.eventId]" doc:name="FV SET eventId" doc:id="bca48490-5b69-4006-b35d-ddac46a437b7" variableName="eventId" />
+		<flow-ref doc:name="Refer to sf-tmw990-check-mandatory-fields" doc:id="e459feee-c321-431f-b74d-ca7095ad4e6b" name="sf-tmw990-check-mandatory-fields"/>
+		<flow-ref doc:name="Refer to sf-tmw990-SalesforceUpsert" doc:id="5c4fd323-a5d2-495a-a88f-8499bc676954" name="sf-tmw990-SalesforceUpsert"/>
+		<logger level="INFO" doc:name="LOG TMW990 VM flow completed" doc:id="dbbb55df-72c1-4b11-b8c7-ba390535058a" message="TMW990 booking response event flow completed with eventId: #[payload.eventContext.eventId]"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="02a31620-002b-4260-b382-3af500204e70" >
+				<logger level="ERROR" doc:name="LOG ERROR" doc:id="d18aefeb-f7b3-4b9c-9270-74c6807e86b2" message="Error occurred in TMW990 flow with eventId: #[vars.eventId] - #[error.description]"/>
+				<ee:transform doc:name="Notification Template" doc:id="84cb8627-8633-42ce-9e64-753bfc514e89">
+					<ee:message>
+						<ee:set-payload resource="dwl/tmw990/p-set-notification-template.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="6d709d27-0fb9-43a5-aa67-943e059ac18e" name="cf-invoke-notification-service"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="sf-tmw990-check-mandatory-fields" doc:id="2bed343f-5aba-40e2-97d5-698aa4412b34" >
+		<logger level="INFO" doc:name="LOG Checking Mandatory Fields" doc:id="c0a1eb86-3954-4905-bb1c-43b32ee49d8a" message="Checking mandatory fields for TMW990 booking response with eventID ---  #[vars.eventId]" />
+		<ee:transform doc:name="Set Required Fields" doc:id="0ed1969e-75ec-4c8f-b136-9b45e1885859">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable resource="dwl/tmw990/v-set-required-fields.dwl" variableName="requiredFields" />
+			</ee:variables>
+		</ee:transform>
+		<validation:is-null doc:name="Validate-Missing-Required-Fields" doc:id="b2f07be2-c113-4d1d-b89f-d626f816bf56" config-ref="Validation_Configuration" value="#[vars.requiredFields.missingFields]" message="#[vars.requiredFields.missingFields]" />
+	</sub-flow>
+	<sub-flow name="sf-tmw990-SalesforceUpsert" doc:id="30822f2f-1bb3-42ff-b654-cbf2f0a45e0e" >
+		<logger level="INFO" doc:name="LOG Upsert Flow Start" doc:id="babc8bc1-1b21-49bc-a4c3-b1f30a9ad21f" message="TMW990 booking response upsert flow started with eventID ---  #[vars.eventId]" />
+		<ee:transform doc:name="Map SF Api Fields" doc:id="576d5898-8f0c-4145-add6-30ec87225a17">
+			<ee:message>
+				<ee:set-payload resource="dwl/tmw990/p-set-sf-api-fields.dwl" />
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert doc:name="invoke-tmw990-event-salesforce" doc:id="cd6b6fd5-3f5c-4eda-841b-4446d4fc6685" config-ref="common_salesforce-configuration" externalIdFieldName="Order_Number__c" objectType="TMW_Order_Details__c" />
+		<logger level="INFO" doc:name="LOG  SF Response " doc:id="e6e75669-3233-4c3e-bff6-d072e9c4895a" message="SF response after TMW990 Event creation: #[%dw 2.0 output application/json --- payload]" />
+		<ee:transform doc:name="Set SF ErrorVariable" doc:id="ace16dea-436b-4b31-b373-6439aae4f477">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable resource="dwl/tmw990/v-set-sf-error-variable.dwl" variableName="errorVariable" />
+			</ee:variables>
+		</ee:transform>
+		<validation:is-true doc:name="Validate-Successful-SF-Upsert" doc:id="58f66ae1-9fb4-4e94-b982-f144f3555337" config-ref="Validation_Configuration" expression="#[(sizeOf(vars.errorVariable)) == 0]" message="Unable to insert tmw990 event data in Salesforce with eventId: #[vars.eventId]" />
+		<logger level="INFO" doc:name="LOG upsert flow completed" doc:id="da1208b3-18c8-4806-952a-1a787a83c8ab" message="TMW990 upsert flow completed with eventID: #[vars.eventId]"/>
+	</sub-flow>
+</mule>

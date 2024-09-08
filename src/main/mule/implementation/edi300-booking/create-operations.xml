@@ -1,0 +1,896 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="parties-create" maxConcurrency="1">
+       <ee:transform doc:name="parties-create" doc:id="da79fc37-214b-4c40-b3e1-2d91fafb16ec" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.parties]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Booking__c",
+	"objectName" : "Party__c",
+	"objectId":vars.bookingsid
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="createObjects-forEach-flow" doc:name="refer to party-create-forEach-flow" doc:id="6b59c9fa-4cfd-419d-85e3-b9746e886137"/>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-parties" doc:id="b916618b-7ee3-47fd-a029-79edb62d8b1b" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Party Objects']"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="2437c51e-ce5f-4ff7-8ad7-6e327b89063e" >
+				<ee:transform doc:name="set ERROR" doc:id="6045ef7e-fbc8-4784-bbec-4db063ff7800">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="varErrorNotify"><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create parties with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="log ERROR" doc:id="9da7f9a8-315e-479a-8707-afeaf2a28c64" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process" />
+				<flow-ref doc:name="refer to notification service" doc:id="1d40171d-7ba0-4cbb-a4a8-f3972d9a0b66" name="common-error-notification"/>
+			</on-error-continue>
+		</error-handler>
+		
+
+    </flow>
+    <flow name="bookingRemarks-create" maxConcurrency="1">
+       <ee:transform doc:name="bookingRemarks-create" doc:id="41e2a2b7-5727-4774-840a-564dbd7d278a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.bookingRemarks]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Booking__c",
+	"objectName" : "Booking_Remark__c",
+	"objectId":vars.bookingsid
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+			<flow-ref name="createObjects-forEach-flow" doc:name="bookingRemarks-create-forEach-flow" doc:id="3253b233-1404-4146-9051-2004d1e0b668"/>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-booking-remarks" doc:id="847ced7d-ba3d-4968-9eb4-719a994b054d" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Booking Remarks Object']"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="77203e80-ad8a-43b1-9447-7ba536c3eec0" >
+				<ee:transform doc:name="set ERROR" doc:id="1e5559ef-6dfb-43fa-b7e1-779334011774" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Booking Remarks Object with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="log ERROR" doc:id="cb1cc175-3cd8-410a-9261-04442014c2ad" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="62e5c585-8a7f-4a6a-9ccb-8a5d3e8d06c6" name="common-error-notification"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+<flow name="transports-create" maxConcurrency="1">
+	<ee:transform doc:name="transports-create" doc:id="9d6f7151-3323-4540-8112-17b8b47f5875" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.transports]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+				<ee:set-variable variableName="transportError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<set-variable value="#[payload]" doc:name="current-transport-variable" doc:id="c33652f2-32b2-4581-b398-c01228c5bce9" variableName="current-transport-variable"/>
+			<ee:transform doc:name="transport-data" doc:id="757fab24-c455-4557-b909-02831994a489" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.transport]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="transportId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+					<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"parentObject__c":"Booking__c",
+	"objectName" : "Transport__c",
+	"objectId":vars.bookingsid
+}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref name="createObjects-forEach-flow" doc:name="refer to transports-create-forEach-flow" doc:id="387a8a79-0899-403a-aed1-d8749c7b2802"/>
+			<set-variable value="#[vars.sfObjectId]" doc:name="transportId" doc:id="a8dc4502-0a46-4bbb-9330-ab805b0a8d68" variableName="transportId" mimeType="application/json"/>
+			<choice doc:name="Choice" doc:id="eafffb7e-f627-4a65-a4c3-82fd286f9630" >
+				<when expression="#[not isEmpty(vars.transportId)]">
+					<flow-ref doc:name="refer to stops-create" doc:id="e137406d-4698-4a94-852b-a9cace970181" name="stops-create" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No action on Stops" doc:id="5060ed62-526f-4fab-a352-f2621ab1c60d" message='#["Unable to create Transports with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default "")]'/>
+				</otherwise>
+			</choice>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-transports" doc:id="76505df6-9c19-438b-9594-36a61bc723ed" config-ref="Validation_Configuration" values="#[vars.transportError]" message="#['Error in Transports Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="36ba1b20-5bac-42a0-85c0-f0942fb26288" >
+			<ee:transform doc:name="set ERROR" doc:id="274169bf-c1c6-485f-b624-9d144f3ef30a" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Transports with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.transportError)) vars.transportError joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="2bcfdf85-dd2a-4b5d-a809-26399839ee66" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="78946f8d-6f5c-4c08-bae2-a005ec79223f" name="common-error-notification"/>
+				<remove-variable doc:name="Remove transportError" doc:id="958a79eb-2bb1-4e06-aca0-a79ae61f39fd" variableName="transportError" />
+		</on-error-continue>
+	</error-handler>
+</flow>
+	<flow name="stops-create" maxConcurrency="1" doc:id="f523816c-f0b9-464f-8b43-c63c5a458e32">
+	<ee:transform doc:name="stops-create" doc:id="c8b450b4-d8fe-439f-92ba-8e6817630519" >
+		<ee:message >
+			<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-transport-variable".stops]]>
+			</ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c": "Transport__c",
+	"objectName" : "Stop__c",
+	"objectId": vars.transportId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to stops-create-forEach-flow" doc:id="efccb471-51da-4643-94af-625d2f179c1b"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-stops" doc:id="a7a789cb-68c8-4ae1-aed4-27ac4ad387d4" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Stops Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f78a5241-affd-44b3-b43a-2da06464fd42" >
+			<ee:transform doc:name="set ERROR" doc:id="7e3133b1-86d5-40fd-9c41-3a176b5feab8" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Stops with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="2482cdf2-c0be-4d6b-9222-72c5485fe38b" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notiification service" doc:id="8db43c9c-84c9-419a-9200-eb4ddf90831d" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="shipments-create" maxConcurrency="1">
+	<ee:transform doc:name="shipments-create" doc:id="7bc709f0-e4b4-4902-9d3b-f6cb7cd01848" >
+		<ee:message >
+			<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.shipments]]>
+			</ee:set-payload>
+		</ee:message>
+		<ee:variables >
+				<ee:set-variable variableName="shipmentError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<set-variable value="#[payload]" doc:name="current-shipment-variable" doc:id="ef2bf108-9de6-4bf7-bec6-9f3705e0e5c7" variableName="current-shipment-variable"/>
+			<ee:transform doc:name="set-shipments-payload" doc:id="a6189e14-0fcd-4b8b-a25d-4a1e3017fc5f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.shipment]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="shipmentId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+					<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Booking__c",
+	"objectName" : "Shipment__c",
+	"objectId":vars.bookingsid
+}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref name="createObjects-forEach-flow" doc:name="refer to shipments-create-forEach-flow" doc:id="f32348c0-bddf-4272-9662-8ec4c01731c9"/>
+			<set-variable value="#[vars.sfObjectId]" doc:name="shipmentId" doc:id="cb0a2a8c-dea0-4e57-bdcc-9b25b15d6264" variableName="shipmentId" mimeType="application/json"/>
+			<choice doc:name="Choice" doc:id="b96b6739-22df-429e-85b9-b50089d5d734" >
+				<when expression="#[not isEmpty(vars.shipmentId)]">
+					<logger level="DEBUG" doc:name="LOG custom-notifications" doc:id="c3642e02-364d-47c1-95cc-429ba1625d7e" message='#[vars."current-shipment-variable".custNotifications]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="add custom-notifications" doc:id="8753088a-f1f2-4b2c-9e30-664aa525e215" name="custNotifications-create" />
+					<logger level="DEBUG" doc:name="LOG doc receipts" doc:id="5ca342e0-c669-4597-8fec-300f46feb840" message='#[vars."current-shipment-variable".receipts]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="add dock-receipts" doc:id="f7ee3f9a-1125-49a1-98cf-265d9c077ce6" name="dock-receipt-create" />
+					<logger level="DEBUG" doc:name="LOG voyages" doc:id="a39a4df0-5021-485f-9e80-953ba447dfd9" message='#[vars."current-shipment-variable".voyages]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="add voyages" doc:id="7c906016-0354-4b49-95cc-e81cb4cb28e2" name="voyages-create" />
+					<logger level="DEBUG" doc:name="LOG freight details" doc:id="2e4a3ef0-0bb0-4ca8-a336-116e28155e53" message='#[vars."current-shipment-variable".freightDetails]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="add freight-details" doc:id="3c3c3604-5ce8-481f-a461-397c5ddf8c04" name="freight-details-create" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No action on Shipment child objects" doc:id="c99caffa-188d-40ab-8d4e-76dbf146778f" message='#["Unable to create Shipments with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default "")]'/>
+				</otherwise>
+			</choice>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-shipments" doc:id="b495c968-5ce7-494c-a4f2-685d29db52bc" config-ref="Validation_Configuration" values="#[vars.shipmentError]" message="#['Error in Shipments Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="cca71439-f1e8-4b6b-b7e3-17ac1c292d49" >
+			<ee:transform doc:name="set ERROR" doc:id="c777c6c5-2b65-4121-83b7-9696c7eee1ec" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Shipments with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.shipmentError)) vars.shipmentError joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="6122f2e8-97d8-4ad9-8eef-37208c9dbe0a" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="2eef6887-cad3-4b68-9ca9-fc9006787716" name="common-error-notification"/>
+				<remove-variable doc:name="Remove shipmentError" doc:id="ec4cb5b0-b814-49ee-be98-69495d501c6a" variableName="shipmentError" />
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="custNotifications-create" maxConcurrency="1" doc:id="47d522e3-6728-4b9b-8ca6-35afe71503c7">
+	<ee:transform doc:name="custNotifications-create" doc:id="3b843ca8-008c-4dc5-b8c1-f70f40c9f451" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-shipment-variable".custNotifications]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Shipment__c",
+	"objectName" : "Customer_Notification__c",
+	"objectId":vars.shipmentId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to custNotifications-create-forEach-flow" doc:id="87931acd-f4c4-4771-b5ee-2c292ad9ecfd"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-custom-notifications" doc:id="da3e7ce0-b2d3-463f-b8b9-e9fb99e220e1" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Custom Notifications Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="1f6daccd-3a68-46c2-a896-0cee7144fcfc" >
+			<ee:transform doc:name="set ERROR" doc:id="58fdfc9c-a4e6-40b9-97d5-f9098ae87d0b" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Custom Notifications with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="5af10bf9-e71a-40a5-876c-169ba80c2841" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="8455419b-9cd0-47b9-b599-0b6f1a577ef7" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="dock-receipt-create" maxConcurrency="1" doc:id="d7daf602-05d0-4c1e-a518-a3c327fd6bf4">
+	<ee:transform doc:name="dock-receipt-create" doc:id="932a0a0c-4b75-449f-95da-4d00515d9067" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-shipment-variable".receipts ]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Shipment__c",
+	"objectName" : "Dock_Receipt__c",
+	"objectId": vars.shipmentId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to dock-receipt-create-forEach-flow" doc:id="9c300517-964c-4afe-a386-705cb710f592"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-doc-receipts" doc:id="b55aa372-043a-4eef-9b37-157e86581bcd" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Doc Receipts Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="80549f57-11f0-401c-921c-a7f4ff8ecfe8" >
+			<ee:transform doc:name="set ERROR" doc:id="efe68701-994d-40bd-a694-44c4cdc232a5" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Doc Receipts with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="88055d74-f0dd-4a1a-a9b5-a541cb49b6ab" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="c0c60d54-612e-42d7-8ebf-9a2d48242eb9" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="voyages-create" maxConcurrency="1" doc:id="895e5de3-ac95-421c-937c-85c1eb6fb0f9">
+	<ee:transform doc:name="voyages-create" doc:id="0be23387-3b50-490a-ba82-d3f9a8cc5d4b" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-shipment-variable".voyages]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Shipment__c",
+	"objectName" : "Voyage__c",
+	"objectId": vars.shipmentId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to voyages-create-forEach-flow" doc:id="e532e7e4-726e-46ca-b90d-8d44a1cca317"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-voyages" doc:id="f301ebfa-a4ec-4b85-a154-6ef0ae6d5368" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Voyages Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="ac7d96f3-7970-4e49-9209-a7cb2da89dcf" >
+			<ee:transform doc:name="set ERROR" doc:id="47b3c15a-a506-4e3a-b0da-811a830d64ff" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Voyages with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="9bfad332-45ec-4d7d-9156-0d0a279c0001" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="4656d9e5-0dfa-484e-977b-2557c6903b18" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="freight-details-create" maxConcurrency="1" doc:id="b80299c8-c66c-4e91-8fd8-86e458df38bc">
+	<ee:transform doc:name="freight-details-create" doc:id="9e1a689a-aa4e-4c67-829f-cbba496dcd7b" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-shipment-variable".freightDetails]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+				<ee:set-variable variableName="freightError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<set-variable value="#[payload]" doc:name="current-frieghtDetail-variable" doc:id="50f73fd0-4df6-4dfd-9c4f-b85e2f92c27e" variableName="current-frieghtDetail-variable"/>
+			<ee:transform doc:name="set-freight-details-payload" doc:id="2d18d98b-87e7-4752-ba9e-7aa05a1460b7" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.freightDetail]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Shipment__c",
+	"objectName" : "FreightDetail__c",
+	"objectId": vars.shipmentId
+}]]></ee:set-variable>
+					<ee:set-variable variableName="freightId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref name="createObjects-forEach-flow" doc:name="refer to frieght-create-forEach-flow" doc:id="50412912-cd38-4adf-b5ae-8dff1c09ed11"/>
+			<set-variable value="#[vars.sfObjectId]" doc:name="freightId" doc:id="a5a959b9-50cf-407c-84a6-e7a93065df01" variableName="freightId"/>
+			<choice doc:name="Choice" doc:id="39ab406d-3b9e-479f-bca5-17a489a141a4" >
+				<when expression="#[not isEmpty(vars.freightId)]">
+					<logger level="DEBUG" doc:name="LOG commodities" doc:id="6441c9ce-dccc-4e02-9dfb-ecd4c4e32588" message='#[vars."current-frieghtDetail-variable".commodities]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="refer to commodity-create-flow" doc:id="54f72b90-c69c-468b-97ed-904960a25fe9" name="commodity-create" />
+					<logger level="DEBUG" doc:name="LOG requirements" doc:id="e6906ca8-7f1c-41fd-b409-2e5a4e104373" message='#[vars."current-frieghtDetail-variable".requirements]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="refer to requirements-create flow" doc:id="4f563947-f0cf-4467-9e07-977183a2aa42" name="requirements-create" />
+					<logger level="DEBUG" doc:name="LOG Cargo Items" doc:id="d9666daa-4f1c-494d-8950-988058cd63f8" message='#[vars."current-frieghtDetail-variable".cargoItem]' category="com.crowley.booking-process"/>
+					<flow-ref doc:name="refer to cargo-item-create flow" doc:id="22e1a769-f852-4f12-a010-54bf6d545519" name="cargo-item-create" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No action on Freight child objects" doc:id="61075454-2abc-4e68-a178-50a835ba7ac2" message='#["Unable to create Freights with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default "")]'/>
+				</otherwise>
+			</choice>
+	</foreach>
+		<validation:is-empty-collection doc:name="validate-freight-details" doc:id="16e8e7bc-74e4-4191-9b3e-1a5c6ca4c92f" config-ref="Validation_Configuration" values="#[vars.freightError]" message="#['Error in Freight Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="8f29a84d-89fa-4e91-8d32-ad7d1d7a1157" >
+			<ee:transform doc:name="set ERROR" doc:id="ff97f2ec-b94b-43cf-9488-672c4cfa3370" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Freights with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.freightError)) vars.freightError joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="0d9b9565-c3b9-44a0-86c5-007217416839" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="ef229468-bbfc-4ad9-aa6c-f0187494f210" name="common-error-notification"/>
+				<remove-variable doc:name="Remove freightError" doc:id="3e221ed9-4609-4b01-a176-29b8f6869268" variableName="freightError" />
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="commodity-create" maxConcurrency="1" doc:id="a24faed6-5362-4f41-b24d-a1bbe38fb418">
+	<ee:transform doc:name="commodity-create" doc:id="227ddd57-fba2-43a3-8e37-00950c5de4bd" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-frieghtDetail-variable".commodities]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Freight__c",
+	"objectName" : "Commodity__c",
+	"objectId" : vars.freightId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to commodities-create-forEach-flow" doc:id="5a8754b0-700c-421c-adf9-a18cf9b38171"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-commodities" doc:id="f673c388-b9d7-4d3a-b7a3-ac29098a3963" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Commodities Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e55c61da-f9bf-4591-aa94-e9a1770e8267" >
+			<ee:transform doc:name="set ERROR" doc:id="9214ab8e-a95d-429f-8f9e-bc7145a9bddb" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Commodities with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="d28d6b4c-8633-42fb-b751-b4265cd23e25" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="33cd4d6a-aa16-4891-a6c4-8ab9b40bd60c" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+
+
+
+<flow name="cargo-item-create" maxConcurrency="1" doc:id="94004fdf-a2bc-4dfa-ad7c-7159612b67b3">
+	<ee:transform doc:name="cargo-item-create" doc:id="399674f4-6fcb-48f0-852f-a0c2e5781c79" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-frieghtDetail-variable".cargoItems default []]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+				<ee:set-variable variableName="cargoError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<set-variable value="#[payload]" doc:name="current-cargo-variable" doc:id="569a368a-4a42-454d-93b4-2aa41c11de56" variableName="current-cargo-variable"/>
+			<ee:transform doc:name="set-req-payload" doc:id="9a8163b6-6ce3-4a1f-8476-6cdf7602ab5a" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.cargoItem]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Freight__c",
+	"objectName" : "Cargo_Item__c",
+	"objectId" : vars.freightId
+}]]></ee:set-variable>
+					<ee:set-variable variableName="cargoitemsId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref name="createObjects-forEach-flow" doc:name="refer to cargo-item-create-forEach-flow" doc:id="85545418-d119-4f1c-8892-89dc69e12b2a"/>
+			<set-variable value="#[vars.sfObjectId]" doc:name="cargoitemsId" doc:id="7d55712a-604c-4245-923e-50b72a4c22bc" variableName="cargoitemsId"/>
+			<choice doc:name="Check Salesforce Response" doc:id="ea3fcb64-a12c-4ff6-a79e-7b85c0c2e7f1" >
+				<when expression="#[not isEmpty(vars.cargoitemsId)]">
+					<flow-ref doc:name="refer to vehicleBreakbulkDetail-create" doc:id="f03f4b40-ad54-4ffc-aa91-bfe1b31fb929" name="vehicleBreakbulkDetail-create"/>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No action on vehicleBreakbulkDetail objects" doc:id="e5ecf35f-1d57-4a81-a729-39e840ff00d0" message='"Unable to create Cargoitems object with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default "")'/>
+				</otherwise>
+			</choice>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-cargo-items" doc:id="e4df03b5-33d7-43e7-95cc-084cf456e10e" config-ref="Validation_Configuration" values="#[vars.cargoError]" message="#['Error in Cargo Items Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="5349ac03-ed14-4702-b24f-1ad534033be5" >
+			<ee:transform doc:name="set ERROR" doc:id="59ab9e48-abfe-4f24-985a-e48b9c491113" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Cargo Items with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.cargoError)) vars.cargoError joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="d40df14d-cfbc-419c-8f5e-2abc83aacecb" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="67dd6553-2bdf-4f7a-bcaa-958d5ef8ead1" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+<flow name="vehicleBreakbulkDetail-create" doc:id="19cfaafb-76a8-45ea-b2e8-02e6163800b4" >
+		<ee:transform doc:name="vehicleBreakbulkDetail-create" doc:id="7263630d-9506-4a4a-b6c0-cd4cea9da1ff" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-cargo-variable".vehicleBreakbulkDetails default []]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Cargo_Item__c",
+	"objectName" : "Vehicle_Breakbulk_Detail__c",
+	"objectId" : vars.cargoitemsId
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="119b55f2-3b02-4a14-aec4-9dee77c0d56d" >
+			<flow-ref doc:name="refer to vehicleBreakbulkDetails-create-forEach-flow" doc:id="cb7c333f-011b-420c-a5d0-a0347d883541" name="createObjects-forEach-flow" />
+		</foreach>
+		<validation:is-empty-collection doc:name="validate-vehicleBreakbulkDetails" doc:id="600ab7f9-0c40-4e4b-b07a-5a6639ef18e0" values="#[vars.errorVariable]" message="#['Error in vehicleBreakbulkDetails Object']"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e079f332-39c6-4e04-bd60-881474882b4c" >
+				<ee:transform doc:name="set ERROR" doc:id="03fb9c68-3ed3-408c-80ad-c665a6daeb7d" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create vehicleBreakbulkDetails with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="153ef414-2bbc-46d5-9ba5-47281a7f7251" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="5007e0c0-77d2-4e02-976e-517d3c49bf74" name="common-error-notification"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="requirements-create" maxConcurrency="1" doc:id="6a4d5e9e-a848-4019-9200-730adf20c738">
+	<ee:transform doc:name="requirements-create" doc:id="805dd515-996e-4f34-8363-dd43a8165137" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-frieghtDetail-variable".requirements]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+				<ee:set-variable variableName="requirementError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+			<set-variable value="#[payload]" doc:name="current-requirement-variable" doc:id="d684ad78-97da-4f2f-a1c7-8ca263ff5d51" variableName="current-requirement-variable" mimeType="application/java"/>
+			<ee:transform doc:name="set-req-payload" doc:id="b88d9920-0244-4a9e-8196-85449b9f0fb0" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.requirement]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="requirementsId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+					<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Freight__c",
+	"objectName" : "Requirement__c",
+	"objectId" : vars.freightId
+}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref name="createObjects-forEach-flow" doc:name="refer to requirements-create-forEach-flow" doc:id="59255bc5-f047-4931-968e-8ae0b299b4ad"/>
+			<set-variable value="#[vars.sfObjectId]" doc:name="requirementsId" doc:id="ac359009-77a4-4230-b243-9db793ef8cf8" variableName="requirementsId" mimeType="application/json"/>
+			<choice doc:name="Choice" doc:id="58038fe9-375d-45a2-bedc-a684557595ba" >
+				<when expression="#[not isEmpty(vars.requirementsId)]">
+					<flow-ref doc:name="refer to equipment-create flow" doc:id="c9c35864-6074-478a-904a-0fa5dc61aa94" name="equipment-create" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No action on Equipment objects" doc:id="90cd5c69-9a7a-4360-a958-23548b5eecce" message='#["Unable to create Requirements with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default "")]'/>
+				</otherwise>
+			</choice>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-requirements" doc:id="134b649a-adc5-4abb-a439-d12c18b17a56" config-ref="Validation_Configuration" values="#[vars.requirementError]" message="#['Error in Requirements Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="7eb9ae87-84cc-4575-b3f6-283f82e1f703" >
+			<ee:transform doc:name="set ERROR" doc:id="b45177ee-fa32-4af8-b174-0048c0ec0409" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Requirements with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.requirementError)) vars.requirementError joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="58e8b9e3-d811-4722-9f6d-a6a7a814bc35" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="eff38736-99e7-443d-b852-06d6cbae90e8" name="common-error-notification"/>
+				<remove-variable doc:name="Remove requirementError" doc:id="d35e1e16-ca5f-414c-9c1f-7f3fe878680d" variableName="requirementError" />
+		</on-error-continue>
+	</error-handler>
+</flow>
+
+<flow name="equipment-create" maxConcurrency="1" doc:id="14b0fee3-a269-408d-bc6f-bd260184eadf">
+	<ee:transform doc:name="equipment-create" doc:id="e09d82d4-fd6f-4b08-b519-157d05818101" >
+		<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars."current-requirement-variable".equipments]]></ee:set-payload>
+		</ee:message>
+		<ee:variables >
+			<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"parentObject__c":"Requirement__c",
+	"objectName" : "Equipment__c",
+	"objectId": vars.requirementsId
+}]]>
+			</ee:set-variable>
+			<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]>
+			</ee:set-variable>
+		</ee:variables>
+	</ee:transform>
+	<foreach doc:name="For Each">
+		<flow-ref name="createObjects-forEach-flow" doc:name="refer to equipment-create-forEach-flow" doc:id="34f3a59b-b41d-47fe-a04f-09f869f4a15c"/>
+	</foreach>
+	<validation:is-empty-collection doc:name="validate-equipments" doc:id="a54b20e8-9009-4118-9ec8-9acc4c51dd66" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message="#['Error in Equipments Object']"/>
+	<error-handler >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f7b4a2e6-1347-42ee-ae3c-25f60aaf38e2" >
+			<ee:transform doc:name="set ERROR" doc:id="a31f05a4-5d6e-433c-8407-31c774fc0e78" >
+				<ee:message ></ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"message":"Unable to create Equipments with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+"errorMessage":if (not isEmpty (vars.errorVariable)) vars.errorVariable joinBy ',' else "",
+"docId":correlationId
+}]]>
+					</ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="ERROR" doc:name="log ERROR" doc:id="c94d0923-1e39-4611-b53d-e7f508bc8323" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="8f3ac759-e636-48b1-aa01-2efeddfddf8f" name="common-error-notification"/>
+		</on-error-continue>
+	</error-handler>
+</flow>
+
+
+
+
+
+
+	
+	
+	<flow name="createObjects-forEach-flow" maxConcurrency="1" doc:id="0c7cc84f-f2d2-4bf5-ae7b-6fb78639ce50">
+        <!--Migration INFO: The 'flow' element no longer has a 'processingStrategy' attribute.-->
+        <!--    For more information refer to:-->
+        <!--        * https://docs.mulesoft.com/mule-runtime/4.3/intro-engine-->
+		<logger level="DEBUG" doc:name="Log payload" doc:id="a1edd3c6-7a9d-4cef-8bbc-5633df03c61b" message="#[payload]" category="com.crowley.booking-process"/>
+		<ee:transform doc:name="add parent id to payload" doc:id="618b2b74-a1b6-4d1b-b6fd-b2917c8e5a6c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	objectType 	: vars.varData.objectName,
+	records		: [ payload ++ { (vars.varData.parentObject__c) : vars.varData.objectId} ]
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="cicsPayload" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="sfObjectId" ><![CDATA[%dw 2.0
+output application/json
+---
+""]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Salesforce-Create-Operation" doc:id="cbb90bde-b972-4e28-a1b4-f7c226955f4c" name="cf-common-salesforce-create"/>
+		<ee:transform doc:name="converting readable payload" doc:id="9647e8cf-0c11-4eb9-8fb0-232d5c158ce2">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="===========After create in ++ ' ' ++#[vars.varData.objectName]  ++ ' : ' ++ #[payload]" level="DEBUG" doc:name="LOG create response from SF" category="com.crowley.booking-process"/>
+		<validation:is-true doc:name="validate-successful-operation" doc:id="85d80dec-089b-48b3-ae71-80dd3d08d297" config-ref="Validation_Configuration" expression="#[payload.successful]" message="#['Create Operation failed ']" />
+		<ee:transform doc:name="save salesforce Id" doc:id="77baff85-1283-4674-8e47-fe07dbb402ef">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+				<ee:set-variable variableName="sfObjectId" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items[0].id]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+		<logger level="INFO" doc:name="LOG Sf Id" doc:id="4a586aea-8b22-4d2d-b606-ccbac6a27512" message="#[vars.sfObjectId]"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="6fea53c7-45a6-4438-b6ce-e3ffd66042df" >
+				<flow-ref doc:name="refer to edi300-booking-set-common-error" doc:id="209fa98b-e70e-4497-92e6-0be4ae22f665" name="edi300-booking-set-common-error"/>
+			</on-error-continue>
+		</error-handler>
+
+    </flow>
+
+</mule>

@@ -1,0 +1,45 @@
+https:
+  clientId : ""
+  clientSecret: ""
+  certificate:
+    key:
+      password: "![dFjL4fKok+iFmrZfI3Q/hg==]"
+    store:
+      password: "![dFjL4fKok+i3cbb7nEZNCQ==]"
+
+#-----------Database Details-----------
+sql:
+  password: "![mn+orVIC0GGV0+VwWwyDdg==]"
+  
+###--------------Salesforce Configuration--------------###
+salesforce:
+  password : "![x6v2i7PfUrg2gewaAGyeaQ==]"
+  consumerKey: "![leL59CYyo66wlhdyJ0lmKwyKMsrsVtQ0dRORq1w8OguSSXT953EfHQzItaqVjQYVxycEptOhUeruYBn5y+ADDavSEHkSubQkjFWumtcV4H2HOmmYjHVLuA==]"
+  consumerSecret: "![lmv1NeE8zUtWrpAD8kSBY/+Yt/xnuIvPs8eZavVUnWBSs6iWSK7yYfNCHyKzrETTsXJxwOejnZDIaFjAy/RO9piT7X1KuBTx]"
+  securityToken: "![aP8AGRJrVaZkA3MchZUoOT5R/2Ipa9j4DsJEYFqwUhA=]"
+
+###--------------Kafka--------------### 
+kafka:
+  consumer:
+    password: "![3XUsCE+OUmW6LarxfUYgx8boDqtnGfqxEDJgg1EVRiydDb3juKm6UPs31Tqs+ziTGeWy5HWqeKq+Vay3MoMOK7tXfgFleDg1]"
+
+###-------------Truck Carrier's' Data Secure Configuration--------------###
+truck:
+  sftp:
+    password: "![hS1XpBRARRvgHpy0OBcr1w==]"
+    
+###--------------Hacienda--------------###
+hacienda:
+  ftp:
+    password  : "![wUI/gG/rDXE81my5sdEwzA==]"
+
+###--------------CDM SF Sync-----------###
+cdm:
+  sf:
+    password: "![x6v2i7PfUrg2gewaAGyeaQ==]"
+
+###--------------START AWS Configurations--------------###   
+aws:
+  s3:
+    accessKey: "![FONRuBYCw7PrTXt5aImAByFKNyFCmVeN]"
+    secretKey: "![yGKuvGx6GcDifrd+IPUf6OjFJw4FKTnDvdfWQOYkQpT1M5b/kaITo3WV04OXiuj5]"

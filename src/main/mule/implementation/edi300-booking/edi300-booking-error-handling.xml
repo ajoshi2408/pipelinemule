@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="edi300-booking-error-handlingError_Handler" doc:id="78fe4d6b-8ecd-4ece-b466-abee70b60c47" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c610d718-377b-45d2-94fc-9ba11182b53e" type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED">
+			<ee:transform doc:name="DW to Set Error Message for Support Ticket Service" doc:id="cf4981a8-8b19-4949-a11f-a123840d0c0c">
+				<ee:message>
+					<ee:set-payload resource="dwl/edi300-booking/support-ticket.dwl" />
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="httpStatus" ><![CDATA[500]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="9965e3d8-ab5d-44bb-b448-0782684737c0" name="cf-invoke-support-ticket-service" />
+		</on-error-propagate>
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="b472616b-a92b-4e92-80a0-f43c97b1b317" type="ANY">
+			<logger level="ERROR" doc:name="LOG ERROR" doc:id="4a87f81b-8482-431a-ba03-4e824a2ef82c" message="[EDI-300-Booking-process] Error in booking service #[error.detailedDescription] for DocId #[vars.varErrorNotify.docId]" category="com.crowley.error.booking-process"/>
+			<ee:transform doc:name="DW to Set Error Message for Notificaton Service &amp; http status" doc:id="411f5bfb-c05d-4688-9685-027a6f03598d">
+				<ee:message>
+					<ee:set-payload resource="dwl/edi300-booking/booking-notification.dwl" />
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="httpStatus" ><![CDATA[500]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="11e974b1-7eac-48fd-bdf3-9660bb4b14cd" name="cf-invoke-notification-service" />
+			<ee:transform doc:name="booking process response" doc:id="e18c6dc8-eb4c-44d2-91d8-51bc5f1b0eee">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "isSuccess"	: false,
+    "message"	: if (not isEmpty(vars.varErrorNotify.message)) (vars.varErrorNotify.message) else if(not isEmpty(error)) error.description else "No information available"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</on-error-propagate>
+	</error-handler>
+	<sub-flow name="common-error-notification" doc:id="0a60e6a3-e0e1-4e02-8a00-6d8a3d6a33df" >
+		<logger level="ERROR" doc:name="log ERROR" doc:id="05c455dd-e7dc-46e1-aad5-63b1350a9da2" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+		<ee:transform doc:name="DW to Set Error Message for Notificaton Service  &amp; http status" doc:id="6cb2a764-f204-486b-900b-d9866178ef20">
+			<ee:message>
+				<ee:set-payload resource="dwl/edi300-booking/booking-notification.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="httpStatus" ><![CDATA[207]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="55baeca1-db18-4402-94d2-852e8ec710af" name="cf-invoke-notification-service" />
+		<ee:transform doc:name="reset errorVariable" doc:id="2d2e61e9-8ae3-4629-868d-9cd89af9e36d" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="edi300-booking-set-common-error" doc:id="effc1e2f-bbc9-4c0d-944b-5a3dc185c06d" >
+		<logger level="INFO" doc:name="Log error" doc:id="f19dbfcc-4db6-42cd-9567-9f5813b90d90" message='#["set error for " ++ (flow.name default "")]'/>
+		<choice doc:name="Set Error Messages for Parent and child objects" doc:id="e64771ab-630b-4058-ae56-b848e258225e" >
+					<when expression="#[vars.varData.objectName == 'Transport__c']">
+						<ee:transform doc:name="set ERROR for transports" doc:id="4d017087-f4e4-4879-8fd3-6c4bde74c1b1">
+							<ee:message>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable variableName="transportError" ><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.transportError + errorResponse]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="ERROR" doc:name="Log ERROR" doc:id="12eb8481-0ee3-4d4d-932d-2aec29186b2d" message="#[vars.transportError]" category="com.crowley.error.booking-process"/>
+					</when>
+					<when expression="#[vars.varData.objectName == 'Shipment__c']">
+						<ee:transform doc:name="set ERROR for  shipments" doc:id="7acce32a-b91e-41d0-96e1-535dbed28467" >
+							<ee:message />
+							<ee:variables >
+								<ee:set-variable variableName="shipmentError" ><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.shipmentError + errorResponse]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="ERROR" doc:name="log ERROR" doc:id="6d56e5ba-bdaf-41a5-a746-e0f58a77fea3" message="#[vars.shipmentError]" category="com.crowley.error.booking-process"/>
+					</when>
+					<when expression="#[vars.varData.objectName == 'FreightDetail__c']">
+						<ee:transform doc:name="set ERROR for freight" doc:id="978dab02-b65f-4d07-ac34-2c2e8fd3d10d" >
+							<ee:message />
+							<ee:variables >
+								<ee:set-variable variableName="freightError" ><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.freightError + errorResponse]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="ERROR" doc:name="log ERROR" doc:id="a841543f-21d6-4087-9797-a05f9483e44a" message="#[vars.freightError]" category="com.crowley.error.booking-process"/>
+					</when>
+					<when expression="#[vars.varData.objectName == 'Requirement__c']">
+						<ee:transform doc:name="set ERROR for requirements" doc:id="b246304d-f6ca-4e7a-b594-bffca4141b42" >
+							<ee:message />
+							<ee:variables >
+								<ee:set-variable variableName="requirementError" ><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.requirementError + errorResponse]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="ERROR" doc:name="log ERROR" doc:id="3dcc7413-65b1-4a06-85fc-726ba0c4ecea" message="#[vars.requirementError]" category="com.crowley.error.booking-process"/>
+					</when>
+					<otherwise >
+						<ee:transform doc:name="set ERROR" doc:id="b5522504-0910-4ed0-ac30-9e529d37a948">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.errorVariable + errorResponse]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+						<logger level="ERROR" doc:name="log ERROR" doc:id="e552a433-1033-44e3-a40d-ab1d617dc4c5" message="#[vars.errorVariable]" category="com.crowley.error.booking-process"/>
+					</otherwise>
+				</choice>
+		
+	</sub-flow>
+</mule>

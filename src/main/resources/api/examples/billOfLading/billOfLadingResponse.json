@@ -1,0 +1,88 @@
+[
+    {
+        "Bill_Of_Lading__c": [
+            {
+                "attributes": {
+                    "type": "Bill_Of_Lading__c",
+                    "url": "/services/data/v39.0/sobjects/Bill_Of_Lading__c/a2k8D000000LUzxQAG"
+                },
+                "Control_Discharge_Port__c": null,
+                "Control_Load_Port__c": null,
+                "Discharge_Port__c": "PRSJU",
+                "Final_Destination__c": "PRSJU",
+                "Initiate_Date__c": "2023-09-25",
+                "Load_Port__c": "USJAX",
+                "Origin_Voyage__c": "SAL3076",
+                "Place_Of_Receipt__c": "USJAX",
+                "Booking_Number__r": {
+                    "attributes": {
+                        "type": "Booking__c",
+                        "url": "/services/data/v39.0/sobjects/Booking__c/a1e8D000000tfANQAY"
+                    },
+                    "Booking_Number__c": "CAT20230925065701863"
+                },
+                "Name": "CWPS3M000079"
+            }
+        ]
+    },
+    {
+        "Commodity__c": [
+            {
+                "attributes": {
+                    "type": "Commodity__c",
+                    "url": "/services/data/v39.0/sobjects/Commodity__c/a1f8D0000003gezQAA"
+                },
+                "Dock_Receipt_Number__c": null,
+                "Hac_Code_Description__c": null,
+                "Unique_Number__c": "0001",
+                "Equipment_Number__c": "13245",
+                "Equipment_Prefix__c": "CMCU",
+                "Item_Sequence__c": "0100",
+                "Quantity_Unit_of_Measure__c": "Automobile",
+                "Quantity_value__c": 1.0
+            }
+        ]
+    },
+    {
+        "Party__c": [
+            {
+                "attributes": {
+                    "type": "Party__c",
+                    "url": "/services/data/v39.0/sobjects/Party__c/a1k8D0000003DDHQA2"
+                },
+                "State__c": "TX",
+                "Phone_Number__c": "12345678",
+                "Type__c": "SHP",
+                "Address_Line1__c": "5810 E HARRISON",
+                "Address_Line2__c": "PO BOX 532563",
+                "Address_Line3__c": "HARLINGEN, TX 78553",
+                "Address_Line4__c": null,
+                "City__c": "HARLINGEN",
+                "CVIF__c": "1912879",
+                "Name": "FRUIT OF THE LOOM INC CUSTOMER TEST 111",
+                "Country__c": "US",
+                "CVIF_Location_Code__c": "99",
+                "Zip_Postal_Code__c": null
+            },
+            {
+                "attributes": {
+                    "type": "Party__c",
+                    "url": "/services/data/v39.0/sobjects/Party__c/a1k8D0000003DDIQA2"
+                },
+                "State__c": "TX",
+                "Phone_Number__c": "12345678",
+                "Type__c": "CON",
+                "Address_Line1__c": "5810 E HARRISON",
+                "Address_Line2__c": "PO BOX 532563",
+                "Address_Line3__c": "HARLINGEN, TX 78553",
+                "Address_Line4__c": null,
+                "City__c": "HARLINGEN",
+                "CVIF__c": "1912879",
+                "Name": "FRUIT OF THE LOOM INC CUSTOMER TEST 111",
+                "Country__c": "US",
+                "CVIF_Location_Code__c": "99",
+                "Zip_Postal_Code__c": null
+            }
+        ]
+    }
+]

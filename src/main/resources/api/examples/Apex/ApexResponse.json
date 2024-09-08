@@ -1,0 +1,14 @@
+{
+    "getBOLDetailsOutput": {
+        "message": "Success",
+        "billofLading": {
+            "attributes": {
+                "type": "Bill_Of_Lading__c"
+            },
+            "Bill_of_lading_Status__c": "IN PROCESS",
+            "Bill_Of_Lading_Number__c": "JAXN0375",
+            "Name": "JAXN0375"
+        },
+        "isSuccess": true
+    }
+}

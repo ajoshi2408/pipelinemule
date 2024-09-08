@@ -1,0 +1,29 @@
+form: FLATFILE
+structures:
+ - id: 'HACIENDA-JSON'
+   name: 'HACIENDA-FILE'
+   data:
+    - { idRef: 'HEADER RECORD', count: 1 }
+    - { idRef: 'DETAIL RECORD', count: '>1' }
+segments:
+ - id: 'HEADER RECORD'
+   name: HEADERRECORD
+   values:
+    - { name: 'RECORD TYPE', type: Integer, length: 1, tagValue: '1'  }
+    - { name: 'LOT NUMBER', type: Integer, length: 7 }
+    - { name: 'INTRODUCTION DATE', type: String, length: 8 }
+    - { name: 'VESSEL NAME', type: String, length: 15 }
+    - { name: 'VOYAGE NUMBER', type: String, length: 6 }
+    - { name: 'FILLER', type: String, length: 98 }
+ - id: 'DETAIL RECORD'
+   name: DETAILRECORD
+   values:
+    - { name: 'RECORD TYPE', type: Integer, length: 1, tagValue: '2' }
+    - { name: 'CONTAINER NUMBER', type: String, length: 17 }
+    - { name: 'FILLER', type: String, length: 1 }
+    - { name: 'BILL OF LADING', type: String, length: 15 }
+    - { name: 'FILLER', type: String, length: 1 }
+    - { name: 'RELEASE NUMBER', type: Integer, length: 8 }
+    - { name: 'FILLER', type: String, length: 2}
+    - { name: 'CONSIGNEE NAME', type: String, length: 30 }
+    - { name: 'FILLER', type: String, length: 60 }

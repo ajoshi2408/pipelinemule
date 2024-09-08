@@ -1,0 +1,22 @@
+###--------------START Riskonnect Configurations--------------###   
+riskonnect:
+  composite:
+    method: "GET"
+    url:  "/services/data/v39.0/query/?q="
+    bookingBoL: "select Bill_Of_Lading_Number__c  from Bill_Of_Lading__c  where Booking_Number__r.Booking_Number__c = "
+    voyageQuery: "select id,Voyage_Number__c,Discharge_Port__c,Loading_Port__c,Loading_Sequence__c,Vessel_Name__c,Estimate_Arrival_Date__c,Estimate_Sail_Date__c from Voyage__c where Bill_of_Lading_Number__r.Bill_Of_Lading_Number__c = "
+    billOfLading: "select Booking_Number__r.Booking_Number__c, Bill_Of_Lading_Number__c, Control_Discharge_Port__c, Control_Load_Port__c, Discharge_Port__c, Final_Destination__c, Initiate_Date__c,  Load_Port__c, Origin_Voyage__c, Place_Of_Receipt__c from Bill_Of_Lading__c where Booking_Number__r.Booking_Number__c ="  
+    commodity:  "select  Bill_Item__r.Bill_of_Lading_Number__r.Booking_Number__r.Booking_Number__c, Bill_Item__r.Bill_of_Lading_Number__r.Bill_Of_Lading_Number__c , Dock_Receipt_Number__c,  Hac_Code_Description__c,  Unique_Number__c,  Equipment_Number__c, Equipment_Prefix__c,  Item_Sequence__c, Quantity_Unit_of_Measure__c, Quantity_value__c  from Commodity__c where Bill_Item__r.Bill_of_Lading_Number__r.Booking_Number__r.Booking_Number__c ="
+    party: "select  Bill_of_Lading_Number__r.Booking_Number__r.Booking_Number__c, Bill_of_Lading_Number__r.Bill_Of_Lading_Number__c, State__c, Phone_Number__c, Type__c, Address_Line1__c,  Address_Line2__c, Address_Line3__c,  Address_Line4__c, City__c, CVIF__c,  Name, Country__c, CVIF_Location_Code__c,  Zip_Postal_Code__c  from  Party__c  where (Type__c = 'SHP' or Type__c = 'CON') and Bill_of_Lading_Number__r.Booking_Number__r.Booking_Number__c ="
+    ###--------------Fetch Contract--------------###
+fetchContract:
+  account.lookup.query: "/services/data/v52.0/query?q=select Id, Name, CVIF__c  FROM Account  WHERE CVIF__c IN"
+  location:
+    lookup.query: "/services/data/v52.0/query?q=select Id, RecordType.DeveloperName, Name from Location__c WHERE RecordType.DeveloperName= 'Location' AND Name  IN "
+    lookup.sub.query: "AND Location_Type__c IN "
+    door.lookup.query: "/services/data/v52.0/query?q=select Id, RecordType.DeveloperName, LcCode__c from Location__c WHERE RecordType.DeveloperName= 'ZipCode' AND LcCode__c  IN"
+    pol.lookup.query: "/services/data/v52.0/query?q=select Id, Location_Type__c, Name from Location__c WHERE Location_Type__c= 'PORT' AND Name  IN "
+    stopId.lookup.query: "select Id, Location_Name__c,Name, LcCode__c, Location_Type__c, SubLocation_Name__c, Sub_Location_Type__c, LocationCode__c, Location__c, SubLocations_Rail__c FROM Location__c where "
+  recordType.query: "/services/data/v52.0/query?q=select Id,DeveloperName from RecordType where SobjectType='|' and DeveloperName='"
+  contract.query: "select Id, Softship_Contract_Number__c, Amendment_Number__c, StatusCode, account.name, account.CVIF__c from Contract where  ContractNumAmendmentNumIdentifier__c ="
+  contract.delete.query: "select id from OptionalServiceException__c where Contract__c =',select id from Contract_Line_Item__c where Contract__c =',select id from Stop__c  where Contract_Id__c =',SELECT Id FROM Contract_Account__c where Contract__c ='"

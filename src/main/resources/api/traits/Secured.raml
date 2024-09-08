@@ -1,0 +1,12 @@
+#%RAML 1.0 Trait
+usage: Apply this to any method that needs to be secured
+description: Authentication
+headers:
+  client_id:
+    description: valid client id for the api
+    type: string
+    required: true
+  client_secret:
+    description: valid client secret for the api
+    type: string
+    required: true

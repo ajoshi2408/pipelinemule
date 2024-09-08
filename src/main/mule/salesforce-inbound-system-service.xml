@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+    <flow name="salesforce-inbound-system-service-main">
+        <http:listener config-ref="main_http-listener" path="${https.basePath}" doc:name="HTTP Listener">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="salesforce-inbound-system-service-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="DW SET PL BAD_REQUEST message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Bad request",
+	error   : error.detailedDescription default error.cause
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="DW SET PL NOT_FOUND message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Resource not found",
+	error   : error.detailedDescription default error.cause
+	
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="DW SET PL METHOD_NOT_ALLOWED message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Method not allowed",
+	error   : error.detailedDescription default error.cause
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[405]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="DW SET PL NOT_ACCEPTABLE message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Not acceptable",
+	error   : error.detailedDescription default error.cause
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[406]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="DW SET PL UNSUPPORTED_MEDIA_TYPE message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Unsupported media type",
+	error   : error.detailedDescription default error.cause
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[415]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="DW SET PL NOT_IMPLEMENTED message and error">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "Not Implemented",
+	error   : error.detailedDescription default error.cause
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[501]]></ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="post:\case:application\json:salesforce-inbound-system-service-config">
+        <flow-ref doc:name="Refer to mf-case-creation" doc:id="53ee9144-cce1-437d-9a12-f8dc5361dd50" name="mf-case-creation" />
+    </flow>
+    <flow name="get:\credits\(docId):salesforce-inbound-system-service-config">
+		<ee:transform doc:name="DW SET FV docId" doc:id="45040380-da1a-4215-b23f-770aefef9843" >
+			<ee:variables >
+				<ee:set-variable variableName="docId" ><![CDATA[attributes.uriParams.'docId']]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<async doc:name="Async" doc:id="0be06349-4079-468f-a437-ff40ef9177d0" >
+			<flow-ref doc:name="Refer to pf-select-db-credit-information" doc:id="90e64a61-7794-43f0-aa84-cb3e4f51f17a" name="pf-select-db-credit-information" />
+		</async>
+		<ee:transform doc:name="DW SET PL Response" doc:id="499fbc21-9b47-4311-959f-ad0ab13c12c3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"Message": "Account Credit Request triggered for DocId: " ++ vars.docId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="post:\apex:application\json:salesforce-inbound-system-service-config">
+        <flow-ref doc:name="Refer to z-common-apex-salesforce" doc:id="6f76a469-de70-4bdf-bd70-b9fad15f4e2a" name="z-common-apex-salesforce" />
+    </flow>
+    <flow name="post:\EDIShippingInstruction:application\json:salesforce-inbound-system-service-config">
+        <flow-ref doc:name="Refer to mf-edi304-sf-processing" doc:id="f7b57c4e-c22c-492f-a94f-4ffa190afa8f" name="mf-edi304-sf-processing" />
+    </flow>
+    <flow name="post:\MDM:application\json:salesforce-inbound-system-service-config">
+        <ee:transform doc:name="DW SET Payload and FVs" doc:id="4b1f7a3f-68c9-4dcc-9be4-310ea34bac1a">
+            <ee:message />
+            <ee:variables>
+                <ee:set-variable resource="dwl/mdm-sync/v-entityName.dwl" variableName="entityName" />
+                <ee:set-variable resource="dwl/mdm-sync/v-entity.dwl" variableName="entity" />
+                <ee:set-variable resource="dwl/mdm-sync/v-startTime.dwl" variableName="StartTime" />
+                <ee:set-variable resource="dwl/mdm-sync/v-initialize-failedRecords.dwl" variableName="failedRecords" />
+                <ee:set-variable resource="dwl/mdm-sync/v-initialize-reprocessRecords.dwl" variableName="reprocessRecords" />
+            </ee:variables>
+        </ee:transform>
+        <async doc:name="Async" doc:id="20fad09d-f84b-4938-bd8d-e4a6a2b79def">
+            <flow-ref doc:name="Refer to mf-MDM-processing" doc:id="b07231d1-7d34-494a-a05e-f22857dcdadd" name="mf-MDM-processing" />
+        </async>
+        <ee:transform doc:name="DW SET Payload Response" doc:id="7484329b-bdf3-4c3f-a86b-3ae793408320">
+            <ee:message>
+                <ee:set-payload resource="dwl/mdm-sync/p-mdm-sync-response.dwl" />
+            </ee:message>
+        </ee:transform>
+        <error-handler ref="mdm-sync-common-error-handler" />
+    </flow>
+	<flow name="post:\cash-payments:application\json:salesforce-inbound-system-service-config">
+		<flow-ref doc:name="Refer to mf-payment-receipts" doc:id="2ec8a3a5-8741-4755-8702-e78fb5c8c9e1" name="mf-payment-receipts"/>
+    </flow>
+    <flow name="post:\customsManifestResponse:application\json:salesforce-inbound-system-service-config">
+		<flow-ref doc:name="Refer to mf-edi355-sf-processing" doc:id="cd65b0c1-370d-49e1-89d6-bd6b17d613a3" name="mf-edi355-sf-processing" />
+    </flow>
+    <flow name="get:\billOfLading\(BoLId):salesforce-inbound-system-service-config">
+        <ee:transform doc:name="DW SET FV billOfLading">
+            <ee:variables>
+                <ee:set-variable variableName="BoLId">attributes.uriParams.'BoLId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <flow-ref doc:name="Refer to mf-get-billOfLading" doc:id="8adceead-a067-4831-8fbf-6bf354e64f75" name="mf-get-billOfLading" />
+    </flow>
+    <flow name="get:\voyageInfo\(BoLId):salesforce-inbound-system-service-config">
+        <ee:transform doc:name="DW SET FV billOfLading">
+            <ee:variables>
+                <ee:set-variable variableName="BoLId">attributes.uriParams.'BoLId'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <flow-ref doc:name="Refer to mf-get-voyageInfo" doc:id="e7088e94-876d-40e2-9e2d-a504ebd44525" name="mf-get-voyageInfo" />
+    </flow>
+    <flow name="get:\bookingBoLs\(BookingNbr):salesforce-inbound-system-service-config">
+        <ee:transform doc:name="DW SET FV bookingNBR">
+            <ee:variables>
+                <ee:set-variable variableName="BookingNbr">attributes.uriParams.'BookingNbr'</ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+		<flow-ref doc:name="Refer to mf-get-bookingBol" doc:id="17de3811-50da-48f8-82d9-b25bb366ddff" name="mf-get-bookingBol"/>
+    </flow>
+	<flow name="post:\compositeRequest:application\json:salesforce-inbound-system-service-config" doc:id="b3b8b803-e827-499c-8396-0ac5a4202969" >
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite" doc:id="44d67d2c-44f2-4595-a5d8-8299dc9c52fc" name="cf-common-salesforce-composite"/>
+		<ee:transform doc:name="DW set payload as JSON" doc:id="cb027439-38f7-4484-b911-6f39e64a8009" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent = false
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="post:\compositeGraph:application\json:salesforce-inbound-system-service-config" doc:id="510925fe-263e-48f1-922f-678d2bedf205" >
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite-graph" doc:id="14802a62-8a95-420a-aef7-7da8cce82a42" name="cf-common-salesforce-composite-graph"/>
+		<ee:transform doc:name="DW set payload as JSON" doc:id="ac8d986e-2fac-4fbe-a5a6-d8851b8ea28d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json indent = false
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+    <flow name="post:\booking-process:application\json:salesforce-inbound-system-service-config">
+        <logger level="DEBUG" doc:name="Log start" doc:id="8f9b9f6a-d00a-4632-973a-570078a87b40" message="booking process started ::::::::::::: #[payload]" category="com.crowley.booking-process"/>
+		<flow-ref doc:name="Refer to edi300 booking process flow" doc:id="07781c5d-e0f6-49e9-b4b2-84df8c5d5528" name="booking-processing"/>
+		<ee:transform doc:name="booking process response" doc:id="238ded96-b501-4828-8c87-318fd3221c39" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if(vars.httpStatus == 207)
+{
+    "isSuccess": true,
+    "message": "Some objects failed to get inserted"
+}
+else
+{
+	"isSuccess": true,
+    "message": "Success"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="get:\bookings\confirmation\(bookingConfirmationNumber):salesforce-inbound-system-service-config" doc:id="e729341d-910d-415f-88df-7646132d7586" >
+		<logger level="INFO" doc:name="Log URI Params" doc:id="c984c208-b512-4c7f-a062-7ffdd4fb196c" message="[API-Booking]::URI params : #[message.attributes.uriParams]"/>
+		<set-variable value="#[message.attributes.uriParams.bookingConfirmationNumber]" doc:name="Set Booking Confirmation Number" doc:id="4ed90640-80f5-4f9f-b3e4-9fe70c96a8fb" variableName="bookingConfNumber"/>
+		<flow-ref doc:name="Refer to sf-get-booking-json" doc:id="6e4b92fc-66b4-4641-a4d4-c526a40082be" name="sf-get-booking-json"/>
+	</flow>
+	<flow name="get:\bookings\status\(bookingReferenceNumber):salesforce-inbound-system-service-config" doc:id="8d61d72c-a763-4cef-95f7-b01a72ab91a2" >
+		<logger level="INFO" doc:name="Log URI Params" doc:id="81ca7c51-65a6-4e6b-955e-8a2da8cc8ee0" message="[API-Booking]::URI params : #[message.attributes.uriParams]"/>
+		<set-variable value="#[message.attributes.uriParams.bookingReferenceNumber]" doc:name="Set Booking Reference Number" doc:id="5050a056-37e9-4c40-9b06-ecb0bced9a2c" variableName="bookingRefNumber"/>
+		<flow-ref doc:name="Refer to sf-get-booking-status" doc:id="a42b0039-cac6-4863-af16-5e9241ada33b" name="sf-get-booking-status"/>
+	</flow>
+	<flow name="post:\DCS-flag:application\json:salesforce-inbound-system-service-config">
+		<flow-ref doc:name="Refer to mf-dcs-flag-update" doc:id="e4470cb8-5167-4d41-ba35-629859d73f9c" name="mf-dcs-flag-update"/>
+    </flow>
+</mule>

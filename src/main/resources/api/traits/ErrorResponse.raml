@@ -1,0 +1,44 @@
+#%RAML 1.0 Trait
+usage: Apply this for Error Responses
+description: Error Responses
+responses: 
+    400:
+      description: Bad Request- Error while processing the request
+      body: 
+        application/json:
+          example: { "Status": "400", "Message": "Bad Request" }
+    500:
+      description: Server Error while processing the request 
+      body: 
+        application/json:
+          example: { "Status": "500", "Message": "Internal Server Error" }
+    503:
+      description: Service is not available at this time
+      body:
+        application/json:
+          example: { "Status": "503", "Message": "Service Unavailable" }
+    401:
+      description: Incorrect Credentials
+      body:
+        application/json:
+          example: { "Status": "401", "Message": "Unauthorized" }
+    403:
+      description: User is not authorized to perform request
+      body:
+        application/json:
+          example: { "Status": "403", "Message": "Forbidden" }
+    404:
+      description: Resource not found
+      body:
+        application/json:
+          example: { "Status": "404", "Message": "Resource not found" }
+    405:
+      description: Method Not Allowed
+      body:
+        application/json:
+          example: { "Status": "405", "Message": "Method Not Allowed" }
+    408:
+      description: Request Timeout
+      body:
+        application/json:
+          example: { "Status": "405", "Message": "Request Timeout" }

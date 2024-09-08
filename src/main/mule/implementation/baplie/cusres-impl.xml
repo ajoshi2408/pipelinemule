@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="mf-cusres-kafka-listener" doc:id="ba6f66a8-a621-4ae2-ba66-ff85866b714c" >
+		<kafka:message-listener doc:name="Message listener" doc:id="a7724a99-90de-4e51-ab7c-36771f64ba56" config-ref="CUSRES_Apache_Kafka_Consumer_configuration">
+			<reconnect frequency="${cusres.kafka.reconnection.frequency}" count="${cusres.kafka.reconnection.attempts}"/>
+		</kafka:message-listener>
+		<ee:transform doc:name="DW Set Read Payload as JSON" doc:id="63270118-b286-4cd6-b632-ccd88f4d8668">
+			<ee:message>
+				<ee:set-payload resource="dwl/cusres/p-cusres-readpayload-as-JSON.dwl" />
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="CUSRES flow started" doc:id="7d5d8ce5-8ef4-4c2d-88bf-8ad11e7bfa51" message="CUSRES processing flow started with Kafka Metadata payload: #[payload]"/>
+		<vm:publish doc:name="Publish to cusres-queue" doc:id="8066426e-c736-42d6-8bde-462ea50ab256" config-ref="common_vm-config" queueName="${cusres.vm.queue}" timeout="${cusres.vm.timeout}"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="3fae83b3-12fb-4268-82ba-0686fabb3be3" >
+		    <ee:transform doc:name="DW Set Support Ticket Payload" doc:id="e3879553-8ba5-47d0-b801-e2861b0d06ec" >
+					<ee:message >
+						<ee:set-payload resource="dwl/cusres/p-cusres-supportTicketPayload.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Log INFO Error Message" doc:id="1f77cca4-94c4-43f0-b02e-73cd58f4a330" message='"Error:" payload.errorMessage'/>
+				<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="041cdf28-abf8-4fb4-9613-ab4e8c51ebc4" name="cf-invoke-support-ticket-service"/>
+				<ee:transform doc:name="DW Set Error Notification Payload" doc:id="7eefdb59-fe88-411a-9763-29a41533610e" >
+					<ee:message >
+						<ee:set-payload resource="dwl/cusres/p-cusres-error-notification-request.dwl" />
+					
+</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="6a6620b7-1570-47a3-b5d6-3e0d248a0514" name="cf-invoke-notification-service"/>
+		    
+		    </on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="mf-cusres-vm-listener" doc:id="a8151124-7990-4824-803f-a587d60dcd24" >
+		<vm:listener doc:name="Listen to cusres-queue" doc:id="8d55a97e-1c27-469c-8b7f-f13f1277f991" config-ref="common_vm-config" numberOfConsumers="${cusres.vm.consumers}" queueName="${cusres.vm.queue}" timeout="${cusres.vm.timeout}"/>
+		<logger level="INFO" doc:name="LOG request received from VM" doc:id="15721d7a-f977-4606-a144-bcfb03e563d9" message="Payload Metadata received at VM for CUSRES: #[payload]"/>
+		<set-variable value="#[payload]" doc:name="FV SET kafkaMetadata" doc:id="05f27175-5bf9-4a7f-a30e-0b2f794e80f7" variableName="kafkaMetadata"/>
+		<flow-ref doc:name="Refer to sf-get-object-from-s3" doc:id="86dacec6-1ba7-4fb2-8017-9e680370d6db" name="sf-get-object-from-s3"/>
+		<ee:transform doc:name="Read Payload" doc:id="ba64da58-54f2-4390-9b15-c06ebb12d76e" >
+			<ee:message >
+				<ee:set-payload resource="dwl/cusres/p-cusres-readpayload-as-JSON.dwl" />
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="FV SET originalPayload" doc:id="1c9bd04b-d7fa-448b-b382-86c091ecc0c6" variableName="originalPayload"/>
+		<ee:transform doc:name="Set DocumentId" doc:id="f97e9769-5fab-4e83-8547-5713f9c32c35" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="documentId" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.originalPayload.customsResponse.messageDetails[0].documentId]]></ee:set-variable>
+				<ee:set-variable variableName="processName" ><![CDATA[%dw 2.0
+output application/java
+---
+"Cusres"]]></ee:set-variable>
+				<ee:set-variable variableName="sfUrl" ><![CDATA[%dw 2.0
+output application/java
+---
+p('salesforce.composite.host')
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-cusres-fetch-vessel-from-salesforce" doc:id="e47804f1-5a2c-4d0a-bb5f-59bf2f76965f" name="sf-cusres-fetch-vessel-from-salesforce"/>
+		<flow-ref doc:name="Refer to sf-cusres-composite-request-processor" doc:id="805b6f57-a4c1-4f61-ad8d-6e9c5ba5ebc0" name="sf-cusres-composite-request-processor"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="88d11823-56ee-4ec1-af00-0a4c6b5fc1cf" >
+				<logger level="ERROR" doc:name="Log ERROR Error Message " doc:id="ddcc3acb-5c50-4893-8c11-1e6b1ec309c0" message="Error occured during processing BAPLIE-Final record due to #[error.detailedDescription], calling Notification Service"/>
+				<ee:transform doc:name="DW SET Error Notification Payload" doc:id="0af6619d-ee34-46e0-9e1b-8de27db12346" >
+					<ee:message >
+						<ee:set-payload resource="dwl/cusres/p-cusres-notification-request.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="d8dc0428-a84e-41e9-88e5-285d07d51b84" name="cf-invoke-notification-service"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<sub-flow name="sf-cusres-fetch-vessel-from-salesforce" doc:id="17469a24-ccf4-4d83-b718-5a5dde17f057" >
+		<logger level="INFO" doc:name="Logger" doc:id="a090580e-ca22-4552-a559-cee278b5742a" />
+		<salesforce:query doc:name="SF Query for vesselEventId" doc:id="c0e0d466-9200-4655-8679-efe59b2f9574" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM VesselEvents__c WHERE Bapkey__c = ':documentId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	documentId : vars.documentId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<set-variable value="#[payload[0].Id]" doc:name="FV Set for vesselEventId" doc:id="ee7d3a95-dde8-4865-a045-d03fac541fb1" variableName="vesselEventId" />
+		<logger level="DEBUG" doc:name="Log query response [Debug]" doc:id="a5662927-e7b5-4c6d-aa3a-bac9ce2cfde9" message="Fetch Vessel Event Id response: #[payload]" category="edi.post.baplie.cusres"/>
+		<validation:is-not-null doc:name="Is vesselEventId not null" doc:id="b15d62eb-9979-4a4d-99fc-4f405b0efdc6" config-ref="Validation_Configuration" message="Unable to Fetch Vessel Event for provided Document ID" value="#[vars.vesselEventId]"/>
+	</sub-flow>
+	<sub-flow name="sf-cusres-composite-request-processor" doc:id="b8ae8345-5036-441b-98d3-d5157346e5b8" >
+		<logger level="INFO" doc:name="Log flow start" doc:id="49164dc6-05d9-4d95-9c5c-63bee21b50c0" message="Cusres Composite Request flow started for Document ID #[vars.documentId]"/>
+		<ee:transform doc:name="Create Composite Request" doc:id="e2a62c33-c7c4-49b0-b300-e420894d98ba" >
+			<ee:message >
+				<ee:set-payload resource="dwl/cusres/p-cusres-composite-request.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite" doc:id="1c9a80a2-4e99-4eee-bb02-29ab1de92f96" name="cf-common-salesforce-composite"/>
+		<flow-ref doc:name="Refer to sf-baplie-cusres-common-composite-response-handler" doc:id="a34099eb-de5d-46fb-8e46-d7fe653b2cad" name="sf-baplie-cusres-common-composite-response-handler"/>
+	</sub-flow>
+</mule>

@@ -1,0 +1,8 @@
+{
+    "methodName":"getBOLDetails^/initializeBOL^HttpGet^String",
+    "className": "CC_GetBOLDetailsJSON",
+    "queryParams": {
+        "bookingid": "a1e8D000000tYvHQAU"
+    },
+    "body": {}
+}

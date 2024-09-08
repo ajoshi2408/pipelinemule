@@ -1,0 +1,108 @@
+[
+  {
+    "invoiceNumber": "CWPM0086122_c",
+    "party": {
+      "code": "SHP",
+      "cvif": {
+        "number": "1912879",
+        "locationCode": ""
+      }
+    },
+    "openItem": {
+      "amount": "5216.75"
+    },
+    "agingDate": "",
+    "batch": {
+      "number": "",
+      "date": "03-16-2022",
+      "sourceName": "Legacy AR"
+    },
+    "accountingPeriod": "",
+    "ar": {
+      "company": ""
+    },
+    "check": {
+      "number": "2345gg",
+      "date": ""
+    },
+    "payorName": "John Bigbucks",
+    "recordHistory": {
+      "creationDate": "03-16-2022 13:17:23.007000",
+      "lastUpdateDate": "03-16-2022 13:20:21.000000",
+      "lastUpdatedBy": ""
+    },
+    "fcnDate": "",
+    "depositDate": "",
+    "payment": {
+      "amount": "3000.00"
+    },
+    "booking": {
+      "number": ""
+    },
+    "originalInvoice": {
+      "amount": "8216.75"
+    },
+    "billOfLading": {
+      "number": ""
+    },
+    "receiptCurrency": {
+      "code": "USD"
+    },
+    "transaction": {
+      "currencyCode": "USD77"
+    }
+  },
+  {
+    "invoiceNumber": "CWPS1M0086_c",
+    "party": {
+      "code": "SHP",
+      "cvif": {
+        "number": "1912879",
+        "locationCode": ""
+      }
+    },
+    "openItem": {
+      "amount": "5216.75"
+    },
+    "agingDate": "",
+    "batch": {
+      "number": "",
+      "date": "03-16-2022",
+      "sourceName": "Legacy AR"
+    },
+    "accountingPeriod": "",
+    "ar": {
+      "company": ""
+    },
+    "check": {
+      "number": "33ghty",
+      "date": ""
+    },
+    "payorName": "John Bigbucks",
+    "recordHistory": {
+      "creationDate": "03-16-2022 13:17:23.007000",
+      "lastUpdateDate": "03-16-2022 13:20:21.000000",
+      "lastUpdatedBy": ""
+    },
+    "fcnDate": "",
+    "depositDate": "",
+    "payment": {
+      "amount": "3000.00"
+    },
+    "booking": {
+      "number": "CAT329071"
+    },
+    "originalInvoice": {
+      "amount": "8216.75"
+    },
+    "billOfLading": {
+      "number": ""
+    },
+    "receiptCurrency": {
+      "code": "USD"
+    },
+    "transaction": {
+      "currencyCode": "USD"
+    }
+  }
+]

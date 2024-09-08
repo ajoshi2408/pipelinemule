@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+	xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="mf-poll-ftp-hacienda"
+		doc:id="e94fa5fa-1b5b-4bbd-a3ce-3427b44487de"
+		initialState="${hacienda.initial.state}"
+		maxConcurrency="${hacienda.maxconcurrency}">
+		<ftp:listener
+			doc:name="Poll Hacienda FTP Server to read files"
+			doc:id="7abdb649-bc19-4d10-94f3-82ee01eb4124"
+			config-ref="hacienda_ftp-configuration"
+			directory="${hacienda.ftp.path}" primaryNodeOnly="true"
+			autoDelete="true"
+			timeBetweenSizeCheck="${hacienda.ftp.filesize.frequency}"
+			timeBetweenSizeCheckUnit="SECONDS" applyPostActionWhenFailed="false">
+			<reconnect-forever
+				frequency="${hacienda.ftp.reconnectionFrequency}" />
+			<scheduling-strategy>
+				<fixed-frequency
+					frequency="${hacienda.ftp.frequency}" timeUnit="SECONDS" />
+			</scheduling-strategy>
+			<ftp:matcher
+				filenamePattern="${hacienda.ftp.fileNamePattern}"
+				caseSensitive="false" />
+		</ftp:listener>
+		<logger level="INFO"
+			doc:name="LOG INFO Initial Log Message with filename and correlationId"
+			doc:id="c166accf-d0a3-4b58-a535-c50f3c203d77"
+			message="HACIENDA: Flow started for hacienda and read the file : #[attributes.fileName] from FTP with correlation id :  #[correlationId]" />
+		<ee:transform
+			doc:name="DW SET variables hacienda originalFileName,haciendaPayload"
+			doc:id="404abdca-d2af-43b7-8a4a-b74601e883ff">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="haciendaFileName"><![CDATA[%dw 2.0
+output application/java
+---
+attributes.fileName]]></ee:set-variable>
+				<ee:set-variable variableName="haciendaPayload"><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="recipientsData" ><![CDATA[%dw 2.0
+output application/json
+var toRecipient = (p("hacienda.toRecipients") default "" splitBy (",")) map
+{
+	 email: $,
+	"type": "TO"
+}
+var ccRecipient = (p("hacienda.ccRecipients") default "" splitBy (",")) map
+{
+	email: $,
+	"type": "CC"
+}
+---
+{
+    "toRecipient": toRecipient,
+	"ccRecipient": ccRecipient
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to sf-hacienda-ftp-cics-folder"
+			doc:id="4c8fb73e-9d4a-42d2-a57c-2c5b0b4489f0"
+			name="sf-hacienda-ftp-cics-folder" />
+		<choice
+			doc:name="check if haciendaPayload size is empty or not"
+			doc:id="5f3c5909-dbe0-4fec-8f83-64ecde2f0937">
+			<when expression="#[isEmpty(vars.haciendaPayload)]">
+				<logger level="INFO"
+					doc:name="LOG INFO Message with Empty file details"
+					doc:id="7cc7b4be-ea9f-4b68-9036-d8983f97fc4f"
+					message="HACIENDA: Received Empty File #[vars.haciendaFileName] for Hacienda, no processing required." />
+				<ee:transform doc:name="DW PAYLOAD Set Error Details"
+					doc:id="20273c54-3009-48f3-a7ef-42a578f25de9">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/hacienda-files/p-empty-file-notification.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to cf-invoke-notification-service"
+					doc:id="e5f35781-353d-4b59-ad5b-6df6ff320245"
+					name="cf-invoke-notification-service" />
+				<flow-ref doc:name="Refer to sf-hacienda-ftp-error-folder"
+					doc:id="566a641c-84fa-430c-ad8c-1da410b099a5"
+					name="sf-hacienda-ftp-error-folder" />
+			</when>
+			<otherwise>
+				<vm:publish queueName="${vm.queueName.hacienda}"
+					doc:name="Publish  Data to VM(hacienda-post-event)"
+					doc:id="7ca331b6-8991-4004-922d-bdedf667fbdf"
+					config-ref="common_vm-config" sendCorrelationId="ALWAYS"
+					correlationId='#[correlationId ++ " " ++ vars.haciendaFileName]'
+					timeout="${hacienda.vm.timeout}">
+					<vm:content><![CDATA[#[vars.haciendaPayload]]]></vm:content>
+				</vm:publish>
+				<logger level="INFO"
+					doc:name="LOG INFO Success Message sent to VM"
+					doc:id="38113390-ae99-48fc-bbf2-dfc6d6acaa5c"
+					message="HACIENDA: Successfully sent file : #[vars.haciendaFileName] to VM for Salesforce processing" />
+			</otherwise>
+		</choice>
+		<error-handler ref="hacienda-common-error-handler"></error-handler>
+	</flow>
+	<flow name="mf-hacienda-vm-consume"
+		doc:id="1ac166a2-2281-49c5-90e2-71b37624fdda"
+		maxConcurrency="${hacienda.maxconcurrency}">
+		<vm:listener queueName="${vm.queueName.hacienda}"
+			doc:name="Read from hacienda-post-event"
+			doc:id="c80ba660-5a67-479f-a8f8-8f7fead0d049"
+			config-ref="common_vm-config"
+			numberOfConsumers="${hacienda.vm.consumers}"
+			timeout="${hacienda.vm.timeout}">
+		</vm:listener>
+		<logger level="INFO"
+			doc:name="LOG INFO Message with Filename and CorrealtionId"
+			doc:id="93a97b9e-ac11-497c-9cbd-f8f54984a4c7"
+			message='HACIENDA: Consumed data from VM with correlationId and filename : #[correlationId]' />
+		<ee:transform
+			doc:name="DW VARIABLE Capture variables Filename and CorrelationId"
+			doc:id="71a9faa1-6e09-4a94-bcb0-dec9faa77a1e">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="correlationId"><![CDATA[%dw 2.0
+output application/json
+---
+(correlationId splitBy " ")[0]]]></ee:set-variable>
+				<ee:set-variable variableName="haciendaFileName"><![CDATA[%dw 2.0
+output application/json
+---
+(correlationId splitBy " ")[1]]]></ee:set-variable>
+				<ee:set-variable variableName="recipientsData" ><![CDATA[%dw 2.0
+output application/json
+var toRecipient = (p("hacienda.toRecipients") default "" splitBy (",")) map
+{
+	 email: $,
+	"type": "TO"
+}
+var ccRecipient = (p("hacienda.ccRecipients") default "" splitBy (",")) map
+{
+	email: $,
+	"type": "CC"
+}
+---
+{
+	toRecipient : toRecipient,
+	ccRecipient : ccRecipient
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#[payload]"
+			doc:name="FV SET haciendaPayload"
+			doc:id="ce113fb3-9a6a-48e2-833a-857bd4f1cedd"
+			variableName="haciendaPayload"
+			mimeType='application/flatfile; schemapath="schemas/hacienda-ftp/hacienda.ffd"' />
+		<ee:transform
+			doc:name="DW VARIABLE Flatfile to json conversion for Hacienda File"
+			doc:id="11498dbf-005d-4ee9-b037-da4b8ff4aea4">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/hacienda-files/v-flatfile-json-mapping.dwl"
+					variableName="haciendaInput" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG"
+			doc:name="LOG DEBUG Json Converted Payload"
+			doc:id="d66c2435-5548-42ce-879c-fc976aa1bb5b"
+			message="HACIENDA: Payload converted from flatfile to json for file : #[vars.haciendaFileName]  : #[vars.haciendaInput]"
+			category="com.crowley.sf.inbound.hacienda" />
+		<flow-ref
+			doc:name="Refer to sf-hacienda-salesforce-processing"
+			doc:id="bb64ce79-7689-4e96-821a-624f382ff0d3"
+			name="sf-hacienda-salesforce-processing" />
+		<logger level="INFO" doc:name="LOG INFO End of Hacienda Flow"
+			doc:id="66868a64-a8e6-4ece-83e1-797875b58665"
+			message="HACIENDA : End of Hacienda Flow for file : #[vars.haciendaFileName]" />
+		<error-handler ref="hacienda-common-error-handler">
+		</error-handler>
+	</flow>
+	<sub-flow name="sf-hacienda-salesforce-processing"
+		doc:id="7a54aa68-5937-492f-8c76-fa04a883070a">
+		<set-variable
+			value='#[(vars.haciendaInput.HaciendaStatus.detailRecords map $.details.bolNumber) distinctBy $]'
+			doc:name="FV SET billOfLadingList"
+			doc:id="c6894b45-cd8b-4cdf-a3df-f4028204c58a"
+			variableName="billOfLadingList" />
+		<ee:transform doc:name="DW Set SFquery Variable"
+			doc:id="2b4575ae-20fe-48c1-9fa2-4590658fefa6">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/hacienda-files/p-bol-salesforce-query.dwl" />
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:query
+			doc:name="SF Query to Check whether BOL Availbale or Not"
+			doc:id="41ae239c-8ea0-4d80-88f9-382dd9af4b78"
+			config-ref="common_salesforce-configuration" target="sfResponse">
+			<salesforce:salesforce-query><![CDATA[#[payload]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform
+			doc:name="DW PAYLOAD Filter available and not available BOL in Salesforce"
+			doc:id="616da11e-79d5-4bf7-8908-b57facf3f5f3">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/hacienda-files/p-salesforce-response-datamatch.dwl" />
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check if any unmatched bolNumbers"
+			doc:id="c27bdb18-69fe-481e-b70a-ad0b7516f4e3">
+			<when expression="#[!(isEmpty(payload.sfNotMatchedResponse))]">
+				<logger level="INFO"
+					doc:name="LOG INFO Message with not available BOLNumber "
+					doc:id="dd77e65e-4dc3-40db-b1f8-0a6694dcacd7"
+					message="HACIENDA : BOL Number : #[payload.bolNumber] not available in Salesforce for file: #[vars.haciendaFileName]" />
+				<ee:transform
+					doc:name="DW PAYLOAD Set Error Details for Triggering Notification"
+					doc:id="284b1170-60e5-4d2b-bf6c-41abd8857f2b">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/hacienda-files/p-bol-not-found-notification.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to cf-invoke-notification-service"
+					doc:id="abe3491b-9146-4aa1-bf37-e1ae41d1984a"
+					name="cf-invoke-notification-service" />
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Message that all bol are available"
+					doc:id="9c86c0d3-6804-4e2c-8fef-cb5cafbd51e9"
+					message="HACIENDA: All BOL's are available in Salesforce for hacienda file #[vars.haciendaFileName]" />
+			</otherwise>
+		</choice>
+		<ee:transform
+			doc:name="DW VARIABLE Hacienda json to Salesforce json Mapping"
+			doc:id="fd01ecc7-dda3-43a1-96c8-5b5b9a4981b3">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/hacienda-files/v-salesforce-mapping.dwl"
+					variableName="sfInsertPayload" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG"
+			doc:name="LOG DEBUG Salesforce Json mapping payload"
+			doc:id="e47a7d24-4e9e-49c4-850f-680b8e41acc7"
+			message="HACIENDA: Salesforce insert payload for file : #[vars.haciendaFileName] is  #[vars.sfInsertPayload]"
+			category="com.crowley.sf.inbound.hacienda" />
+		<choice
+			doc:name="check if sizeof salesforce insertion payload is empty or not"
+			doc:id="bb0631f3-dec4-47d8-a61b-fa8c7ce3ed5a">
+			<when expression="#[!(isEmpty(vars.sfInsertPayload))]">
+				<flow-ref
+					doc:name="Refer to sf-hacienda-salesforce-composite-trigger"
+					doc:id="9137a84b-7b8d-4d5f-9ca5-a9ca90266d00"
+					name="sf-hacienda-salesforce-composite-trigger" />
+			</when>
+			<otherwise>
+				<logger level="INFO"
+					doc:name="LOG INFO Message that all BoL's not available in salesforce"
+					doc:id="07ba4bb5-80c0-4cda-a03a-b94703bacfd0"
+					message="HACIENDA: All BOL's received from Hacienda FTP Server are not available in Salesforce for file : #[vars.haciendaFileName]" />
+				<flow-ref doc:name="Refer to sf-hacienda-ftp-error-folder"
+					doc:id="33378a43-d596-4f3c-905a-947a9d38d957"
+					name="sf-hacienda-ftp-error-folder" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="sf-hacienda-salesforce-composite-trigger"
+		doc:id="c3281a30-d644-42da-b8f4-8da666d476b4">
+		<set-variable value="#[[]]"
+			doc:name="FV SET CompositeResponse Empty Array"
+			doc:id="7e3aafa1-5ec8-44d7-a48e-ace5cc720dd5"
+			variableName="compositeResponse" />
+		<foreach doc:name="FOR EACH sfInsertPayload"
+			doc:id="d92e4cae-6bca-4c1f-9676-1f9c1b63c7f0"
+			batchSize="${hacienda.batchSize}"
+			collection="#[vars.sfInsertPayload]">
+			<ee:transform
+				doc:name="DW PAYLOAD [POST]SF Composite  Request"
+				doc:id="96a68dd3-c536-40b0-bb32-65b81ef78ab7">
+				<ee:message>
+					<ee:set-payload
+						resource="dwl/hacienda-files/p-sf-composite-mapping.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-common-salesforce-composite"
+				doc:id="a3d004a4-5d09-4333-b006-42578b785ffa"
+				name="cf-common-salesforce-composite" />
+			<logger level="DEBUG"
+				doc:name="LOG DEBUG Payload after Salesforce Insertion"
+				doc:id="8e2bda77-7c4f-4635-aa3d-31b50ba3f1e4"
+				message="HACIENDA: Composite Response post hacienda request to salesforce : #[payload] for file : #[vars.haciendaFileName]"
+				category="com.crowley.sf.inbound.hacienda" />
+			<ee:transform
+				doc:name="DW SET variable compositeResponse accumlated response"
+				doc:id="d30f3089-41e3-4115-b026-648c773e1f56">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="compositeResponse"><![CDATA[%dw 2.0
+output application/json
+---
+vars.compositeResponse ++ (payload.compositeResponse default [])]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+
+		</foreach>
+		<logger level="DEBUG"
+			doc:name="LOG DEBUG Salesforce Final Response"
+			doc:id="1a20d655-077e-4eb0-8eaa-89a4b6fe2cf5"
+			message="HACIENDA: Composite Response after inserting records of file #[vars.haciendaFileName] into Salesforce  : #[vars.compositeResponse]"
+			category="com.crowley.sf.inbound.hacienda" />
+		<ee:transform
+			doc:name="DW VARIABLE Filter Success and Failure Records"
+			doc:id="497681b3-5dc3-4e06-9eda-e3171a36373b">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/hacienda-files/v-salesforce-compositeResults.dwl"
+					variableName="compositeResults" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO"
+			doc:name="INFO LOG Number of Success and Failure Records in File"
+			doc:id="7bb91a85-b23f-4be9-ae48-e6648c8a0951"
+			message="Success Records : #[sizeOf(vars.compositeResults.finalResponse) default 0] and Failure Records : #[sizeOf(vars.compositeResults.compositeErrorResponse) default 0] for file #[vars.haciendaFileName]" />
+		<choice
+			doc:name="check if any errors in compositeresponse after salesforce insertion"
+			doc:id="c443d327-1bc9-418e-a72e-bdecdc57cfa0">
+			<when
+				expression="#[!(isEmpty(vars.compositeResults.compositeErrorResponse))]">
+				<ee:transform doc:name="DW PAYLOAD Set Error Details"
+					doc:id="58068575-fc54-4d70-b3b0-6495c8e4c59e">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/hacienda-files/p-salesforce-insert-error.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO"
+					doc:name="LOG INFO Failure Message with Filename"
+					doc:id="728ae98d-acbc-4f6f-8442-78e832b1c1d7"
+					message="HACIENDA: Email Notification Flow triggered as failed to insert record into Salesforce for file #[vars.haciendaFileName]" />
+				<flow-ref
+					doc:name="Refer to cf-invoke-notification-service"
+					doc:id="7d5d3c92-3cf8-4365-b5ed-fc18e5b42ea7"
+					name="cf-invoke-notification-service" />
+				<logger level="DEBUG"
+					doc:name="LOG DEBUG Salesforce Error Response "
+					doc:id="7a3a5d97-8bc9-4aa4-8229-8379847b5170"
+					message="HACIENDA : Error Occured while inserting into Saleforce for file : #[vars.haciendaFileName] : for the reference id #[vars.compositeResults.compositeErrorResponse.referenceId]"
+					category="com.crowley.sf.inbound.hacienda" />
+				<flow-ref doc:name="Refer to sf-hacienda-ftp-error-folder"
+					doc:id="d48adbda-07a3-488b-ae2a-200757b827eb"
+					name="sf-hacienda-ftp-error-folder" />
+			</when>
+			<otherwise>
+				<flow-ref
+					doc:name="Refer to sf-hacienda-ftp-archive-folder"
+					doc:id="a38347be-a7cc-4b01-bfc3-3caf7ee51977"
+					name="sf-hacienda-ftp-archive-folder" />
+				<logger level="DEBUG" doc:name="LOG DEBUG Final Response"
+					doc:id="47ef292b-6421-4daf-828b-818a0b003375"
+					message="HACIENDA : Final Response after insertion into Saleforce for file : #[vars.haciendaFileName] :  #[vars.compositeResults.finalResponse]"
+					category="com.crowley.sf.inbound.hacienda" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+</mule>

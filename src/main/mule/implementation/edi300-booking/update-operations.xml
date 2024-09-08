@@ -1,0 +1,1606 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	
+	<flow name="common-update-forEach-flow" doc:id="909f1bb7-badc-4e6e-8a2e-a3dfab9471f9">
+		<set-variable variableName="cicsPayload" value="#[payload]" doc:name="CICS Payload"/>
+		<ee:transform doc:name="comparing payoad with SFID" doc:id="dee110fb-4dae-43c3-86eb-bdd15529aed8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfidFromQuery= vars.sfidFromQuery filter( 	 if(vars.varData.objectName == "Party__c") (($.Type__c ++ $.CVIF__c) == (payload.Type__c ++ payload.CVIF__c)) 
+										 	else ($."$(vars.varData.filterId)") == (payload."$(vars.varData.filterId)"))
+		   
+var objid = ((vars.varData.parentObject__c) : vars.varData.objectId)
+		   
+var sfID = (sfidFromQuery map (objSFID,indexOfSF)->
+{
+	Id: objSFID.Id
+}) reduce($$ + $)
+---
+{
+	objectType	: vars.varData.objectName,
+	records		: [payload ++ (if(sfID != null) sfID else {}) ++ objid]
+}
+	]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfObjectId" ><![CDATA[%dw 2.0
+output application/java
+---
+""]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice- update/create">
+            <when expression="#[payload.records[0].Id != null]">
+				<flow-ref doc:name="Refer to cf-common-salesforce-update" doc:id="60d0322c-fb3e-445b-9131-36293ad8495e" name="cf-common-salesforce-update"/>
+            </when>
+            <otherwise>
+				<flow-ref doc:name="Refer to cf-common-salesforce-create" doc:id="4177aefc-2c2e-48dc-a84c-0f2cd0346f23" name="cf-common-salesforce-create"/>
+            </otherwise>
+        </choice>
+
+        <ee:transform doc:name="converting readable payload" doc:id="4ebcb08c-d0ee-4622-a310-7f64dbc1093f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="============ SF response after #[vars.varData.objectName] :: #[payload]" level="DEBUG" doc:name="response after SF operation" category="com.crowley.booking-process"/>
+		<ee:transform doc:name="set sfObjectId" doc:id="8137ce3f-0744-43f1-a5b7-7f4dccd2881d" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfObjectId" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<validation:is-true config-ref="Validation_Configuration" message='#["unable to update " ++ (vars.varData.objectName default "")]' expression="#[payload.successful]" doc:name="validate-successful-operation" />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="a9bb63b3-e6eb-4188-bef1-364c925b3478" >
+				
+				
+				
+				<flow-ref doc:name="refer to edi300-booking-set-common-error" doc:id="670459db-216b-4ed6-83f1-af4b96106db8" name="edi300-booking-set-common-error"/>
+			</on-error-continue>
+		</error-handler>
+
+    </flow>
+		
+	
+    <flow name="common-delete-flow" doc:id="69cf66d6-418f-4860-be36-6ee1a07f757e" >
+		<choice doc:name="Choice - delete/nodelete">
+            <when expression="#[payload != null]">
+            	<flow-ref doc:name="Refer to cf-common-salesforce-delete" doc:id="713c9e12-1849-425c-ac8f-8eb47bacc5cb" name="cf-common-salesforce-delete"/>
+				<validation:is-true doc:name="validate-successful-operation" doc:id="dd5f8b47-47e0-4f3f-92e6-886f33736e02" config-ref="Validation_Configuration" expression="#[payload.successful]" message='#["unable to delete " ++ (vars.varData.objectName default "")]'/>
+            </when>
+            <otherwise>
+                <logger message="no delete operations" level="INFO" doc:name="No delete" />
+            </otherwise>
+        </choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="f2d02263-87aa-448a-847a-5db37753ebd1" >
+				<ee:transform doc:name="set ERROR" doc:id="a907265d-7d1a-41ea-878d-defd9aeddce1" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java  
+var errorResponse = if (not isEmpty (payload.items[0].message))
+  (payload.items[0].message ++ " for " ++ (vars.varData.objectName default "") ++ " : " ++ (vars.cicsPayload.Name default ""))
+else if (not isEmpty(error)) error.description
+else
+  ("Error while processing the " ++ vars.varData.objectName ++ "-" ++ (vars.cicsPayload.Name default ""))
+---
+vars.errorVariable + errorResponse]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="b9059457-78f3-49ca-9eeb-c68e467b3321" message="#[vars.errorVariable]" category="com.crowley.error.booking-process"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="parties-update">
+
+        <ee:transform doc:name="parties" doc:id="5a2c35ab-0e92-49ac-83aa-27ebcbaef31a" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	parentObject__c	: "Booking__c",
+	objectName		: "Party__c",
+	objectId		: (vars.bookingsid)
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="c01264ae-1899-4887-ae0e-d0c34dccbdb8" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,CVIF__c,Type__c,Do_Not_Delete__c FROM Party__c WHERE Booking__c = ':bookingsid']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"bookingsid" : vars.bookingsid
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="e8cb1683-cc99-44cb-acaa-38354cbba146" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for parties based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with parties payload" doc:id="a5378901-ad55-4959-bdfd-2e367cca3752" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = if((sizeOf(payload)) >0) (payload map ($.Type__c default "" ++ $.CVIF__c default "")) else []
+var partyList = if ((sizeOf(vars.storedPayload)) >0) (vars.storedPayload.parties map ($.Type__c default "" ++ $.CVIF__c default "")) else []
+var out = if (sfList != null) (if (partyList != null) (sfList -- partyList) else sfList) else null
+var ids = if (out != null) ((out map (aa, b) -> 
+ 	(a: (payload filter (($."Type__c" ++ $."CVIF__c") == aa and $."Do_Not_Delete__c" == "false") map $).Id) 
+ 	if ((sizeOf (payload filter (($."Type__c" ++ $."CVIF__c") == aa and $."Do_Not_Delete__c" == "false"))) >0))) else null
+---
+ flatten([ ids.a]) reduce ($$++$)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="68edbd50-9114-4ae4-88ff-9e46b7bfe235" name="common-delete-flow"/>
+		<ee:transform doc:name="parties payload" doc:id="1bbc1aa9-e705-4b3e-a685-91ccba68e933" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.parties]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate parties" doc:id="ee14fb14-0b44-40d1-b4c1-232056d61f6d" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]'/>
+		<error-handler>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="095e5d8a-b359-4a1c-88b9-2bc4c92544ea" >
+				<ee:transform doc:name="set ERROR" doc:id="8b403563-2b6e-4c9c-839e-47dca336a76d" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update parties with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update parties",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="380752e1-c69a-4590-ba71-87dc96ee315c" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="7d43f9f0-799c-4b61-be7a-4ee9f921631f" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+
+    	<flow name="transports-update" doc:id="d02b598e-9c34-4805-83dc-4ed00b1f5af7">
+
+        <ee:transform doc:name="transport" doc:id="eced8435-f4fe-4018-bed0-b56c6f0c40f4">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="transportError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="da3b75b2-4719-483a-80f2-75af56a46128" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Transport_Id__c FROM Transport__c WHERE Booking__c = ':bookingsid']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"bookingsid" : vars.bookingsid
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="aa05b4e6-291c-4c2a-95fd-1643e59a16d9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for transport based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with transport payload" doc:id="591084c9-1fba-4455-9fc1-c72606989d15" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Transport_Id__c
+var transportList = vars.storedPayload.transports.transport.Transport_Id__c
+var out = if (sfList != null) (if (transportList != null) (sfList -- transportList) else sfList) else null
+var sfids = if (out != null) ((out map (transport,indexOftransport) -> 
+ 	sfid: (payload filter $.Transport_Id__c == transport map $).Id)) else null
+---
+flatten([ sfids.sfid]) reduce ($$++$)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="c1a0bf56-25d2-4c4b-8004-201e63c2b183" name="common-delete-flow" />
+		<ee:transform doc:name="transports payload" doc:id="eb6390b4-d3b8-430f-badf-028fdac8d880" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.transports]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <ee:transform doc:name="set varData" doc:id="5c98bfb6-13ca-4f2c-b053-01c4595ba354">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Booking__c",
+	objectName		: "Transport__c",
+	objectId		: vars.bookingsid,
+	filterId		: "Transport_Id__c"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+			<set-variable value="#[payload]" doc:name="current-transport-variable" doc:id="4772f817-24fc-42ed-83bf-1b95f17f6852" variableName="current-transport-variable" mimeType="application/java"/>
+			<set-payload value="#[payload.transport]" doc:name="Set transport" doc:id="bbc56ae6-77f9-4753-9e25-e606897f48e6" mimeType="application/java"/>
+			<flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+			<ee:transform doc:name="storing transport SFID" doc:id="f8b9e146-cae9-4d64-9442-c7de8d60f10e">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+							<ee:set-variable variableName="transportId"><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<choice doc:name="Choice update/no update" doc:id="84c15a2a-7841-41ee-b617-52dfb9184886" >
+				<when expression="#[not isEmpty(vars.transportId)]">
+					<flow-ref doc:name="stops-update" doc:id="c78278ce-9e60-4924-bcb9-b059ff87bef1" name="stops-update" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No sub objects update" doc:id="c93c3a41-11e7-4822-b89d-3122a53c78d8" message="skip transport sub objects update"/>
+				</otherwise>
+			</choice>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-transport" doc:id="4d4a95e6-a7fd-4397-8574-087b5e515518" config-ref="Validation_Configuration" values="#[vars.transportError]" message='#["Error in updating Transport__c objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="0765b849-fba7-42da-8878-f3819142b6fa" >
+				<ee:transform doc:name="set ERROR" doc:id="4c527d3a-1fa3-4225-b680-c4b30085556b" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update transport with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.transportError) ) vars.transportError joinBy ',' else error.description default "Unable to update transport",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="c18d4919-2239-410c-9259-b660d68623b5" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="bc3ee60a-3aae-4af8-9407-9435b66717a4" name="common-error-notification" />
+				<remove-variable doc:name="Remove transportError" doc:id="c5fedcf4-bc37-4f12-9d43-49f00a61c09e" variableName="transportError"/>
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="stops-update">
+
+        <ee:transform doc:name="stops" doc:id="e2f98e38-a592-4df7-975e-d131ec002ecf">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Transport__c",
+	objectName		: "Stop__c",
+	objectId		: vars.transportId,
+	filterId		: "StopId__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="ae2907e0-40ae-470c-8a41-d84585941543" config-ref="common_salesforce-configuration" readTimeoutUnit="HOURS">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,StopId__c FROM Stop__c WHERE Transport__c = ':transportId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"transportId" : vars.transportId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="6b2d7d76-7ba2-4887-8291-9b4a9d6605e6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message='Response from Salesforce for stops based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is #[payload]' level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+		<ee:transform doc:name="comparing SF payload with stops payload" doc:id="fe5bb131-d3a2-4af2-bf82-970f5e236164" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.StopId__c
+var stopList = vars.'current-transport-variable'.stops.StopId__c
+var out = if (sfList != null) (if (stopList != null) (sfList -- stopList) else sfList) else null 
+var sfids = if (out != null) ((out map (stop,indexOfstop) -> 
+ 	sfid: (payload filter $.StopId__c == stop map $).Id)) else null
+---
+ flatten([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="c38f57e8-8b66-4520-a1ed-631c2f31bf68" name="common-delete-flow" />
+		<ee:transform doc:name="stops payload" doc:id="60d7c9f6-d330-4d81-8ee3-28a7e11d81b9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-transport-variable'.stops]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-stops" doc:id="5ad671f0-8c40-46d2-a638-c0023df3262d" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="47e4549d-1728-4eb3-9804-72d082a8f56b" >
+				<ee:transform doc:name="set ERROR" doc:id="8fd485d2-431f-4f46-a483-fe463d506232" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update stops with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update stops",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="f4bf0326-1f4c-47ae-ab09-95fe8a5c5193" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="e56da538-7525-4130-8a2b-79b3c4f36c05" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="shipment-update" doc:id="25faf72c-b4bb-4bde-b73a-f48e8029ef1e">
+
+        <ee:transform doc:name="shipment" doc:id="3ef6ef84-4a99-491e-8702-9e0ae4f04aa7">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="shipmentError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="c1600872-bd05-409d-a414-7c4bb77eb9b6" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Shipment_Number__c FROM Shipment__c WHERE Booking__c = ':bookingsid']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"bookingsid" : vars.bookingsid
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="88421b14-6b3c-44e8-a5c7-3542e109d436" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for shipment based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with shipment payload" doc:id="aaddbd3e-ca86-443c-a7f6-e6c32961f5d4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Shipment_Number__c
+var shipmentList = vars.storedPayload.shipments.shipment.Shipment_Number__c
+var out = if (sfList != null) (if (shipmentList != null) (sfList -- shipmentList) else sfList) else null 
+var sfids = if (out != null) ((out map (shipment,indexOfShipment) -> 
+ 	sfid: (payload filter $.Shipment_Number__c == shipment map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to common-delete-flow" doc:id="45f67a9d-af55-4666-abd2-c183ad295fb8" name="common-delete-flow" />
+		<ee:transform doc:name="shipment payload" doc:id="2384c55f-9c32-459b-9576-dca7f7b1dc3e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.shipments]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <ee:transform doc:name="set varData" doc:id="7b632d6a-9242-428b-bf91-73ca984d2308">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Booking__c",
+	objectName		: "Shipment__c",
+	objectId		: vars.bookingsid,
+	filterId		: "Shipment_Number__c"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+			<set-variable value="#[payload]" doc:name="current-shipment-variable" doc:id="7f1678e5-da38-4af9-9039-f26cca7c96f6" variableName="current-shipment-variable" mimeType="application/java"/>
+			<set-payload value="#[payload.shipment]" doc:name="Set shipment" doc:id="7ac91b5c-cc22-4d1f-8bb4-2ec6e70102e0" mimeType="application/java"/>
+			<flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+			<ee:transform doc:name="storing shipment SFID" doc:id="f2a01a6f-f417-4822-95c7-7848d0bb7686">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="shipmentId"><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<choice doc:name="Choice update/no update" doc:id="d04e4d9e-55b9-43fd-9654-91e5f2b4334f" >
+				<when expression="#[not isEmpty(vars.shipmentId)]">
+					<flow-ref doc:name="custNotifications-update" doc:id="94055fc1-1f6f-4fdf-9b0c-c99420c03556" name="custNotifications-update" />
+					<flow-ref doc:name="voyages-update" doc:id="8f7ddeb9-356c-4c49-8a29-c0c33b190d10" name="voyages-update" />
+					<flow-ref doc:name="dockreceipts-update" doc:id="0a729160-a434-4f4a-aae0-eb34c27dc1e6" name="dockreceipts-update" />
+					<flow-ref doc:name="freight-details-update" doc:id="1a0f608d-eadb-4a32-99c2-d15fafd2daeb" name="freight-details-update" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No sub objects update" doc:id="bb6b1fc0-10b7-462b-9757-4b97d7235671" message="skip shipment sub objects update"/>
+				</otherwise>
+			</choice>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-shipment" doc:id="030445e4-eeb4-4527-94f9-fa558d378ba2" config-ref="Validation_Configuration" values="#[vars.shipmentError]" message='#["Error in updating Shipment__c objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="a1c87fd4-2fcd-4b08-b064-cbe8d2c8bfb4" >
+				<ee:transform doc:name="set ERROR" doc:id="bab1d7df-a548-453f-a1d1-d9d04341efc6" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update Shipment with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.shipmentError) ) vars.shipmentError joinBy ',' else error.description default "Unable to update shipment",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="2fe61c3c-7f48-4fff-a25f-285f5f9a2522" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="2a03cf76-d2da-4821-a20c-5cc35d4dc640" name="common-error-notification" />
+				<remove-variable doc:name="Remove shipmentError" doc:id="43eee0d7-0532-496f-925d-c431f6d9b20f" variableName="shipmentError" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="custNotifications-update">
+
+        <ee:transform doc:name="custNotifications" doc:id="41662c67-0ac5-4e10-bff8-61829b71ac4b">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Shipment__c",
+	objectName		: "Customer_Notification__c",
+	objectId		: vars.shipmentId,
+	filterId		: "Notifications_ID__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="313faa78-f87b-437e-9502-6abd2d0dd6e5" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Notifications_ID__c FROM Customer_Notification__c WHERE Shipment__c = ':shipmentId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"shipmentId" : vars.shipmentId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="8e2fcc5b-43a1-404e-9751-125fa1e9d526" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for custNotification based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with custNotification payload" doc:id="3f40e6d9-d510-47b7-840c-c1f3c4700ba3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Notifications_ID__c
+var custNotifyList = vars.'current-shipment-variable'.custNotifications.Notifications_ID__c
+var out = if (sfList != null) (if (custNotifyList != null) (sfList -- custNotifyList) else sfList) else null 
+var sfids = if (out != null) ((out map (custNotify,indexOfcustNotify) -> 
+ 	sfid: (payload filter $.Notifications_ID__c == custNotify map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $) 
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to common-delete-flow" doc:id="2f71b741-3267-472c-88e4-7bc8d4a9ea6e" name="common-delete-flow" />
+		<ee:transform doc:name="custNotifications payload" doc:id="f16d0147-2015-42f1-b0cc-b89a42361ea3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-shipment-variable'.custNotifications]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate custNotification" doc:id="bfda77a7-c5fa-402d-94fe-fc7bd4038637" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="662ded10-b755-4930-9091-3f25e8971fa4" >
+				<ee:transform doc:name="set ERROR" doc:id="89f4c49e-8b54-49c3-b360-105035fd707a" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update customer notification with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update customer notification",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="cd273382-ce83-400b-92a8-1d9578e740e6" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="aed60856-0238-4d1a-b286-ea381aac6816" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="voyages-update" doc:id="71c748f6-e361-4a1c-925b-21129d944290">
+
+        <ee:transform doc:name="voyages" doc:id="9c54cb5b-f202-471a-8d1d-b174fd2a3a33">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Shipment__c",
+	objectName		: "Voyage__c",
+	objectId		: vars.shipmentId,
+	filterId		: "Voyage_Number__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="3c6362e5-b8fd-4bb7-a53f-1d81697e9a39" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Voyage_Number__c FROM Voyage__c WHERE Shipment__c = ':shipmentId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"shipmentId" : vars.shipmentId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="14983a7b-2e79-4e62-b69e-dac8f4d277ec" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for voyage based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with voyages payload" doc:id="35043549-02e2-430c-aa7b-b0ff4b4c05ff" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Voyage_Number__c
+var voyageList = vars.'current-shipment-variable'.voyages.Voyage_Number__c
+var out = if (sfList != null) (if (voyageList != null) (sfList -- voyageList) else sfList) else null
+var sfids = if (out != null) ((out map (voyage,indexOfVoyage) -> 
+ 	sfid: (payload filter $.Voyage_Number__c == voyage map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $) 
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to common-delete-flow" doc:id="64700019-2a58-4387-bff5-24417f65496b" name="common-delete-flow" />
+		<ee:transform doc:name="voyages payload" doc:id="2cbe9e1a-1061-4c83-ba5b-6f302e57cc25" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-shipment-variable'.voyages]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-voyages" doc:id="16ba10cf-f6e6-498e-ba87-3ba4ea2d5ba1" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d3945d66-4b41-47d8-a206-057f80584946" >
+				<ee:transform doc:name="set ERROR" doc:id="4ef2404e-3a01-492f-aae8-69569b56ea39" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update voyages with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update voyages",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="f91e523e-f6cd-4228-b5c5-7e1914b3d9b8" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="c154ac6e-38f5-4c15-a2c5-8f088c2963ee" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+<flow name="dockreceipts-update">
+		<ee:transform doc:name="dockreceipts" doc:id="aac08b87-0795-4729-ace2-19894921f742">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Shipment__c",
+	objectName		: "Dock_Receipt__c",
+	objectId		: vars.shipmentId,
+	filterId		: "ReceiptNumber__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="d8cc0cd1-57a6-4163-9c11-45230e31177f" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,ReceiptNumber__c FROM Dock_Receipt__c WHERE Shipment__c = ':shipmentId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"shipmentId" : vars.shipmentId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="a72ee28d-229f-4cab-a67f-fcd2a1124fc9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for dock receipt based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with dockrecipts payload" doc:id="e95318c8-29be-489c-b4d9-519609b6e0cf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.ReceiptNumber__c
+var receiptList = vars.'current-shipment-variable'.receipts.ReceiptNumber__c
+var out = if (sfList != null) (if (receiptList != null) (sfList -- receiptList) else sfList) else null
+var sfids = if (out != null) ((out map (receipt,indexOfreceip) -> 
+ 	sfid: (payload filter $.ReceiptNumber__c == receipt map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $) 
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="7a733480-f85a-495f-8d57-c40ffb5cd7ee" name="common-delete-flow" />
+		<ee:transform doc:name="receipts payload" doc:id="3988ec3b-cb05-4728-9af3-6c8e7f3017f4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-shipment-variable'.receipts]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-receipts" doc:id="db866550-c6b8-4e39-989e-dd90b35af806" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f1b55292-929e-404f-a276-5fe0bb758b96" >
+				<ee:transform doc:name="set ERROR" doc:id="c2032016-338d-4f9b-b5d8-a3856779d8ec" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update dock receipts with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update dock receipts",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="f604870b-56a9-408d-9287-4b6dccb908cc" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="d4c0d6b0-e1ea-4c6d-af4a-c5e256827f26" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="freight-details-update" doc:id="ba0e4f27-4660-44a0-806d-7d80bf14d014">
+		<ee:transform doc:name="freight" doc:id="3e9a062c-8162-464a-8bfb-a4e3d0031971">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="freightError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="d3969ade-6bec-46ae-91a6-390ebfdd28e0" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,FreightId__c FROM FreightDetail__c WHERE Shipment__c = ':shipmentId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"shipmentId" : vars.shipmentId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="4abdae6d-be0c-499b-85d5-b3042ec9a0d2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for freight details based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with freight payload" doc:id="2d30b558-1050-4e95-8482-f02b551c2c4a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.FreightId__c
+var freightList = vars.'current-shipment-variable'.freightDetails.freightDetail.FreightId__c
+var out = if (sfList != null) (if (freightList != null) (sfList -- freightList) else sfList) else null 
+var sfids = if (out != null)  ((out map (freight,indexOffreight) -> 
+ 	sfid: (payload filter $.FreightId__c == freight map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="472bba56-f722-405f-b370-9f89a07f5eb8" name="common-delete-flow" />
+		<ee:transform doc:name="FreightDetail payload" doc:id="72ba23e9-c615-4e04-a1c7-9973bfd2dc50" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-shipment-variable'.freightDetails]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <ee:transform doc:name="varData" doc:id="057d8fc5-7234-4bdc-967e-7e66966b50b9">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Shipment__c",
+	objectName		: "FreightDetail__c",
+	objectId		: vars.shipmentId,
+	filterId		: "FreightId__c"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+			<set-variable value="#[payload]" doc:name="current-frieghtDetail-variable" doc:id="74c7a493-1be3-4952-a84f-86aa1a2e44f9" variableName="current-frieghtDetail-variable" mimeType="application/java"/>
+			<set-payload value="#[payload.freightDetail]" doc:name="Set freightDetail" doc:id="a6e8fd4a-00a3-4c9e-b821-fa2b9d51b1d2" mimeType="application/java"/>
+			<flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+			<ee:transform doc:name="storing freight SFID" doc:id="b6948524-2d84-4b41-9c5f-ec7c2aa06565">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="freightId"><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<choice doc:name="Choice update/no update" doc:id="671c1108-87f9-45ec-b418-9842462e4e13" >
+				<when expression="#[not isEmpty(vars.freightId)]">
+					<flow-ref doc:name="commodity-update" doc:id="8e2316b3-1ec7-46fa-bd0e-5ea31a4aa48d" name="commodity-update" />
+					<flow-ref doc:name="requirements-update" doc:id="67a08cb9-9147-497d-8d25-dbb7a6d71427" name="requirements-update" />
+					<choice doc:name="Choice" doc:id="e3a4fb8a-da29-4c20-ab8d-4733c7ee966c">
+				<when expression="#[vars.storedPayload.booking[0].EDI_Booking__c == true]">
+					<flow-ref doc:name="refer to pf-cargo-item-update" doc:id="c2e91469-be53-4fe1-afc5-11652b865c68" name="pf-cargoitem-update" />
+				</when>
+				<otherwise>
+					<logger level="INFO" doc:name="Log value of EDI_Booking__c" doc:id="3aa26035-8b9b-4dac-b4e5-e56ceb49af84" message="Value of EDI_Booking__c: #[vars.storedPayload.booking[0].EDI_Booking__c]" />
+				</otherwise>
+			</choice>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No sub object update" doc:id="dbf1c3d4-661b-40db-b163-b65673178ab2" message="skip freight sub objects update"/>
+				</otherwise>
+			</choice>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-freight" doc:id="032c02f0-a292-4d24-91a5-9baf5de54263" config-ref="Validation_Configuration" values="#[vars.freightError]" message='#["Error in updating FreightDetail__c objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e8552875-4019-4c4c-84df-d6e7c8344110" >
+				<ee:transform doc:name="set ERROR" doc:id="60a6fec1-dbe6-4b21-a909-f8fbb067531e" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update freight with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.freightError) ) vars.freightError joinBy ',' else error.description default "Unable to update freight",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="8f7fbf40-50c0-4490-9f96-a444c384fc61" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="1c3481a1-5dcb-4561-a3b4-ceba9d55a706" name="common-error-notification" />
+				<remove-variable doc:name="Remove freightError" doc:id="919f6e2c-19d2-4787-98e9-01f5c8bd2920" variableName="freightError" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="commodity-update">
+		<ee:transform doc:name="commodity" doc:id="1468e0e6-f5db-4477-95f5-1e5a1664c0cd">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Freight__c",
+	objectName		: "Commodity__c",
+	objectId		: vars.freightId,
+	filterId		: "CommodityId__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="e1c994f5-6f78-469b-880a-01771e233cc2" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,CommodityId__c FROM Commodity__c WHERE Freight__c = ':freightId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"freightId" : vars.freightId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="a5e098b6-596e-40d1-a54a-0bfe919fc9e1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for commodity based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with commodity payload" doc:id="0526c6b9-d1d3-43a5-8b9c-85dcebc04540" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.CommodityId__c
+var commodityList = vars.'current-frieghtDetail-variable'.commodities.CommodityId__c
+var out = if (sfList != null) (if (commodityList != null) (sfList -- commodityList) else sfList) else null 
+var sfids = if (out != null) ((out map (commodity,indexOfcommodity) -> 
+ 	sfid: (payload filter $.CommodityId__c == commodity map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="f7114b4d-5726-4751-bd96-c22b6ab2207f" name="common-delete-flow" />
+		<ee:transform doc:name="commodities payload" doc:id="b7375c19-85e9-41ba-94cf-7fb598f83fc5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-frieghtDetail-variable'.commodities]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-commodities" doc:id="96ca994b-e5ad-4fee-b325-d0399557d46d" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="288dd1cf-ee74-47b2-a52f-bd7aa652696f" >
+				<ee:transform doc:name="set ERROR" doc:id="528e2add-8e25-4f7d-812c-a6368bd5cd22" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update commodity with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update commodity",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="b6deb953-d696-433b-950c-867d07bdd119" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="1870e477-7a3c-40fe-b8cb-521559ea8595" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="requirements-update" doc:id="0fccd98a-2188-4928-a80c-9eb4bb23f238">
+		<ee:transform doc:name="requirement" doc:id="addcb856-ff28-4ee5-a9d2-64dbf6db7212">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="requirementError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="5322f560-6c52-4dc5-a410-691e474336ce" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,RequirementId__c FROM Requirement__c WHERE Freight__c = ':freightId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"freightId" : vars.freightId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="a32995ef-4f70-49de-8866-6e70229339d0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for requirement based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with requirement payload" doc:id="81cd2f3f-f41e-48a5-8733-6db1e908f013" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.RequirementId__c
+var requirementList = vars.'current-frieghtDetail-variable'.requirements.requirement.RequirementId__c
+var out = if (sfList != null) (if (requirementList != null) (sfList -- requirementList) else sfList) else null
+var sfids = if (out != null) ((out map (requirement,indexOfrequirement) -> 
+ 	sfid: (payload filter $.RequirementId__c == requirement map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="677427cc-3fc8-41ad-b965-a185b8caad51" name="common-delete-flow" />
+		<ee:transform doc:name="requirements payload" doc:id="ce78f3bb-05e0-46ef-b14f-a89ced85c96c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-frieghtDetail-variable'.requirements]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <ee:transform doc:name="set varData" doc:id="f215f8ef-ab35-4d6e-8f58-0000dfa39a19">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Freight__c",
+	objectName		: "Requirement__c",
+	objectId		: vars.freightId,
+	filterId		: "RequirementId__c"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+			<set-variable value="#[payload]" doc:name="current-requirement-variable" doc:id="24919fd3-379e-4729-93cd-4b28ebc59803" variableName="current-requirement-variable" mimeType="application/java"/>
+			<set-payload value="#[payload.requirement]" doc:name="Set requirement" doc:id="c0f696e4-04be-4e3e-b1f8-d76571d046e0" mimeType="application/java"/>
+			<flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+			<ee:transform doc:name="storing requirement SFID" doc:id="2c678bc0-6294-4077-935a-7d1e4d8c60ee">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="requirementId"><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<choice doc:name="Choice update/no update" doc:id="8b0e0255-df3c-48c1-bfe5-4b90eff900ca" >
+				<when expression="#[not isEmpty(vars.requirementId)]">
+					<flow-ref doc:name="equipment-update" doc:id="8eca1cc9-bd9d-4946-b099-17fd7241b140" name="equipment-update" />
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No equipment update" doc:id="e39bd839-d4ed-4846-975c-d8892740bc2a" message="skip requirement sub objects update"/>
+				</otherwise>
+			</choice>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-requirement" doc:id="d33a4f4c-642c-405b-8485-71cc8b2cc36f" config-ref="Validation_Configuration" values="#[vars.requirementError]" message='#["Error in updating Requirement__c objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="228eac05-d936-4bc1-9d97-51719f60e624" >
+				<ee:transform doc:name="set ERROR" doc:id="75abdfe1-1062-4b63-9711-9bd13060587f" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update requirement with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.requirementError) ) vars.requirementError joinBy ',' else error.description default "Unable to update requirement",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="437d6ebf-4755-4fec-8f63-5584304131e2" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="851fec50-11d6-499e-81a0-0f96b0b13607" name="common-error-notification" />
+				<remove-variable doc:name="Remove requirementError" doc:id="1b7bfe76-f368-4ae7-943d-cc33395fd7a6" variableName="requirementError" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="equipment-update">
+		<ee:transform doc:name="equipment" doc:id="0a962670-b8a2-4d9a-8e6c-6e9a4a89904d">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Requirement__c",
+	objectName		: "Equipment__c",
+	objectId		: vars.requirementId,
+	filterId		: "Sequence_Id__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="04259223-4d5c-44c2-a5a3-931b009205eb" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Sequence_Id__c FROM Equipment__c WHERE Requirement__c = ':requirementId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"requirementId" : vars.requirementId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+
+        <ee:transform doc:name="converting readable payload" doc:id="5df7873a-3df8-44a5-ad86-d01e0a612c27" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for equipment based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with equipment payload" doc:id="734fac97-d964-4564-8f14-c931e9a4311f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Sequence_Id__c
+var equipmentList = vars.'current-requirement-variable'.equipments.Sequence_Id__c
+var out = if (sfList != null) (if (equipmentList != null) (sfList -- equipmentList) else sfList) else null 
+var sfids = if (out != null) ((out map (equipment,indexOfequipment) -> 
+ 	sfid: (payload filter $.Sequence_Id__c == equipment map $).Id)) else null
+---
+ flatten ([ sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="a24431f4-9c8a-408a-9914-b676751782b2" name="common-delete-flow" />
+		<ee:transform doc:name="equipments payload" doc:id="e52ac430-9c9c-4e82-a43d-5a4d26b86697" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-requirement-variable'.equipments]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-equipments" doc:id="c730ac96-fa81-4fd2-8962-247b5cfe597b" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="1eeae73a-165a-446d-93ae-f6489ec119dc" >
+				<ee:transform doc:name="set ERROR" doc:id="2aea9058-69a0-4d48-b7b4-51e9c359dc81" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update equipment with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update equipment",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="5a195e1d-a782-40e7-8ddf-ca8c75312c5f" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="8a4b26f9-79be-49da-b6cb-9efce9424028" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+    
+    <flow name="pf-cargoitem-update">
+		<ee:transform doc:name="cargoItem" doc:id="d7384899-cd03-4f41-8f7d-c9dac7d4d086">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="cargoitemError" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="45ccb030-6aa0-447d-a4e8-d62c6ff5b1c2" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,ItemId__c FROM Cargo_Item__c WHERE Freight__c = ':freightId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"freightId" : vars.freightId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+
+        <ee:transform doc:name="converting readable payload" doc:id="840ed556-ab3f-4310-93e6-98a1202d6017" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for cargo item based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with cargoItem payload" doc:id="31565902-68c2-46a7-8fc7-4358c2f8d357" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.ItemId__c
+var cargoItemList = vars.'current-frieghtDetail-variable'.cargoItem.ItemId__c
+var out = if (sfList != null) (if (cargoItemList != null) (sfList -- cargoItemList) else sfList) else null 
+var sfids = if (out != null) ((out map (cargoItem,indexOfcargoItem) -> 
+ 	sfid: (payload filter $.ItemId__c == cargoItem map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="a3815276-cb4d-47f1-b272-b6e188445948" name="common-delete-flow" />
+		<ee:transform doc:name="cargoItem payload" doc:id="f71f8c49-d98c-4db6-9341-2201b9099aca" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-frieghtDetail-variable'.cargoItems]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <ee:transform doc:name="set varData" doc:id="f4a16fac-1207-4efb-9ed6-e1a484612303" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "FreightDetail__c",
+	objectName		: "Cargo_Item__c",
+	objectId		: vars.freightId,
+	filterId		: "ItemId__c"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[payload]" doc:name="current-cargoitem-variable" doc:id="3f2e3fc6-168d-4f6f-bfd2-f705055695ff" variableName="current-cargoitem-variable"/>
+			<set-payload value="#[payload.cargoItem]" doc:name="Set cargoItem" doc:id="09d32d17-f6c0-424f-8744-3b86f0e97fa2" />
+			<flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+			<ee:transform doc:name="storing cargoItem SFID" doc:id="a2529114-407b-484a-8920-fad01baecb86" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="cargoItemId" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.items[0].id]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<choice doc:name="Choice" doc:id="e024ef38-b6ef-47d3-be8a-5eea76b4f2dd" >
+				<when expression="#[not isEmpty(vars.cargoItemId)]">
+					<flow-ref doc:name="refer to vehicleBreakbulkDetail-update" doc:id="67ea59d3-f282-4541-94a1-d5b4ac90afb5" name="vehicleBreakbulkDetail-update"/>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="No cargoitem update" doc:id="3ca006c5-746e-4b47-9904-2025bed39be4" message="skip cargoitem sub objects update"/>
+				</otherwise>
+			</choice>
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-cargoItem" doc:id="ecd65158-accc-4895-a57c-c9baa91a9053" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="b572e412-e04a-45d6-893c-d02edbe44d80" >
+				<ee:transform doc:name="set ERROR" doc:id="cc9a2016-318e-478f-9432-01564ab0ba77" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update cargo item with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.cargoitemError) ) vars.cargoitemError joinBy ',' else error.description default "Unable to update cargo item",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="8bb70632-fee8-4ab2-9fe8-93c6cf3f2ad2" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="e2c941db-df6d-479b-91b0-157a36be7dfe" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+	
+	<flow name="vehicleBreakbulkDetail-update" doc:id="3db75dd2-7609-44ea-92ec-836063172c54" >
+		<ee:transform doc:name="Transform Message" doc:id="4bb79624-1ef8-4642-b6bf-9d920e82eb0b" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="errorVariable" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="varData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Cargo_Item__c",
+	objectName		: "Vehicle_Breakbulk_Detail__c",
+	objectId		: vars.cargoItemId,
+	filterId		: "ItemId__c"
+}
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="92f6b4c8-ace6-4bc6-b6d9-15337beaab1a" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,ItemId__c FROM Vehicle_Breakbulk_Detail__c WHERE Cargo_Item__c = ':cargoItemtId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"cargoItemtId" : vars.cargoItemId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="converting readable payload" doc:id="35a1263e-14b6-43d5-81c2-f6721b1dd408" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="log SF response" doc:id="105846f0-cfd5-47b9-9f09-836e537c0652" message="Response from Salesforce for vehicleBreakbulkDetail based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]"/>
+		<ee:transform doc:name="comparing SF payload with vehicleBreakbulkDetail payload" doc:id="0634b5c6-4ebb-4233-b46a-2e4b58f54dbb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Sequence_Id__c
+var vehicleBreakbulkDetailList = vars.'current-cargoitem-variable'.vehicleBreakbulkDetails.ItemId__c
+var out = if (sfList != null) (if (vehicleBreakbulkDetailList != null) (sfList -- vehicleBreakbulkDetailList) else sfList) else null 
+var sfids = if (out != null) ((out map (vehicleBreakbulkDetail,indexOfequipment) -> 
+ 	sfid: (payload filter $.ItemId__c == vehicleBreakbulkDetail map $).Id)) else null
+---
+ flatten ([ sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to common-delete-flow" doc:id="9f60943c-5ae6-431f-86e0-524943f05628" name="common-delete-flow"/>
+		<ee:transform doc:name="vehicleBreakbulkDetail payload" doc:id="2cdcb8dd-1b30-4d8b-9f39-21a45f17cdc3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.'current-cargoitem-variable'.vehicleBreakbulkDetails]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="8e2b480a-5256-4b77-9833-2e34e534b386" >
+			<flow-ref doc:name="common-update-forEach-flow" doc:id="728b2205-6498-4860-9fbf-85f4a19fbb7c" name="common-update-forEach-flow" />
+		</foreach>
+		<validation:is-empty-collection doc:name="validate-vehicleBreakbulkDetail" doc:id="a007724d-abac-48a9-87b4-49d4de26d795" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' config-ref="Validation_Configuration"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="76306b9c-ef6d-4d33-ac30-e7d73f2cfd26" >
+				<ee:transform doc:name="set ERROR" doc:id="5de9032d-c82e-4a64-9c04-ee32accb22a5" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update vehicleBreakbulkDetail with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update vehicleBreakbulkDetail",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="e5144646-be73-48fa-8b53-b4a655d0717d" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="2f76badd-7a7b-4b59-8cea-316ef6b6be3d" name="common-error-notification"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="bookingRemarks-update">
+		<ee:transform doc:name="bookingRemarks" doc:id="0d953c5a-b162-4c7e-91a8-b6414c5b4ef7">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="varData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	parentObject__c	: "Booking__c",
+	objectName		: "Booking_Remark__c",
+	objectId		: vars.bookingsid,
+	filterId		: "Line_Number__c"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="errorVariable"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <salesforce:query doc:name="Salesforce - retrieve SFIDs" doc:id="0943bebd-7cbf-45cf-9cb4-8c9839e3b832" config-ref="common_salesforce-configuration">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id,Line_Number__c FROM Booking_Remark__c WHERE Booking__c = ':bookingsid']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"bookingsid" : vars.bookingsid
+}]]]></salesforce:parameters>
+		</salesforce:query>
+
+        <ee:transform doc:name="converting readable payload" doc:id="aff2fdbc-38a0-4e78-a0d8-23d192ad3ae3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger message="Response from Salesforce for booking remarks based on bookingid : #[vars.storedPayload.bookingIdToBeChecked] is  #[payload]" level="DEBUG" doc:name="log SF response" category="com.crowley.booking-process"/>
+
+        <ee:transform doc:name="comparing SF payload with bookingRemarks payload" doc:id="6ddedf17-cebc-48f7-baf0-f37b6eccf968" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var sfList = payload.Line_Number__c
+var bookingRemarkList = vars.storedPayload.bookingRemarks.Line_Number__c
+var out = if (sfList != null) (if (bookingRemarkList != null) (sfList -- bookingRemarkList) else sfList) else null 
+var sfids = if (out != null) ((out map (bookingRemark,indexOfbookingRemark) -> 
+ 	sfid: (payload filter $.Line_Number__c == bookingRemark map $).Id)) else null
+---
+ flatten ([sfids.sfid]) reduce ($$ ++ $)
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfidFromQuery" ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+
+        <flow-ref doc:name="Refer to common-delete-flow" doc:id="4ccac244-a6f9-4eb3-aa38-909274f4642a" name="common-delete-flow" />
+		<ee:transform doc:name="bookingRemarks  payload" doc:id="57961c2c-3980-49de-814b-71db66e48567" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.storedPayload.bookingRemarks]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each">
+            <flow-ref name="common-update-forEach-flow" doc:name="common-update-forEach-flow" />
+        </foreach>
+		<validation:is-empty-collection doc:name="validate-remarks" doc:id="c4f6fb5f-555f-437b-8e12-5492b535010f" config-ref="Validation_Configuration" values="#[vars.errorVariable]" message='#["Error in updating " ++ (vars.varData.objectName default "") ++ " objects"]' />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="6764f804-780e-4f43-b259-01721d10666a" >
+				<ee:transform doc:name="set ERROR" doc:id="e1db8ef0-ee99-4d66-a3d4-4134126f9f9d" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="varErrorNotify" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Unable to update remarks with Booking number: " ++ (vars.storedPayload.bookingIdToBeChecked default ""),
+	"errorMessage": if ( not isEmpty (vars.errorVariable) ) vars.errorVariable joinBy ',' else error.description default "Unable to update booking remarks",
+	"docId": correlationId
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="log ERROR" doc:id="735476a4-b559-4cdc-8faa-728c8044f75d" message="#[vars.varErrorNotify.message]" category="com.crowley.error.booking-process"/>
+				<flow-ref doc:name="refer to notification service" doc:id="04767d2d-fdea-462b-afff-cc5fd8467fe6" name="common-error-notification" />
+			</on-error-continue>
+		</error-handler>
+
+
+    </flow>
+	
+	
+</mule>

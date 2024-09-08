@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="mf-dcs-flag-update"
+		doc:id="efb2ee80-fbf4-421e-8ce6-8c4e833e1fbc">
+		<logger level="INFO" doc:name="LOG INFO Flow Start"
+			doc:id="f92432e4-7653-4c07-8ed5-56cbc91bb5b7"
+			message='#[flow.name ++ " Start"]' />
+		<ee:transform doc:name="DW SET FV SF Query"
+			doc:id="4ecd0567-ef1f-4bd6-9b8d-c5f761f657b0">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="originalRequest"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable
+					resource="dwl/dcs-flag/v-sf-equipment-query.dwl"
+					variableName="varQuery" />
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-common-salesforce-query"
+			doc:id="d120630a-364f-4275-b073-7fbc0b191e68"
+			name="cf-common-salesforce-query" target="sfQueryResponse" />
+		<logger level="DEBUG" doc:name="LOG DEBUG SF Query Response"
+			doc:id="3a459887-edf9-4a23-ab8e-1019bac6f631"
+			message="#[%dw 2.0&#10;output application/json&#10;---&#10;vars.sfQueryResponse]"
+			category="com.crowley.sfssinbound.dcsflag" />
+		<choice doc:name="Choice"
+			doc:id="3c107fdb-8d5c-4fab-babc-19eddd4ff491">
+			<when expression="#[isEmpty(vars.sfQueryResponse)]">
+				<logger level="INFO" doc:name="LOG INFO Creating Case"
+					doc:id="83962ca1-c31a-49f1-bffc-58c4603a75fa"
+					message="#[&quot;Bill of Lading and Equipment Number combination does not exist!&quot; &#10;++ &quot; equipmentNumber : &quot; ++ (payload.ContainerNo default '')&#10;++ &quot; billOfLading : &quot; ++ (payload.BillOfLading default '')]" />
+				<ee:transform
+					doc:name="DW SET Case Creation Metadata Payload"
+					doc:id="96147ce5-eabb-4668-afea-b02925c4a8d6">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/dcs-flag/p-case-creation-fields.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to mf-case-creation"
+					doc:id="44a392de-0087-42f2-9c31-0375855c19b2"
+					name="mf-case-creation" target="caseCreationResponse" />
+				<ee:transform doc:name="DW SET Notification Payload"
+					doc:id="4607c40f-a9a2-48c7-bf1e-589e7b8a40d4">
+					<ee:message>
+						<ee:set-payload
+							resource="dwl/dcs-flag/p-notification-fields.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to cf-invoke-notification-service"
+					doc:id="2c675a3d-743e-4ba0-ac7b-70eb40eb3f1b"
+					name="cf-invoke-notification-service" target="notificationResponse" />
+			</when>
+			<otherwise>
+				<ee:transform doc:name="DW SET Update Request Payload" doc:id="d507d277-b202-44af-a3d2-022f4dd5f566">
+					<ee:message>
+						<ee:set-payload resource="dwl/dcs-flag/p-record-update.dwl" />
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Refer to cf-common-salesforce-update" doc:id="becd9a31-4816-46cf-ac95-2d193be1af6e" name="cf-common-salesforce-update" target="sfUpdateResponse" />
+				<logger level="DEBUG" doc:name="LOG DEBUG SF Update Response" doc:id="5c3f1cb3-b236-4ceb-aca4-8622e730fef4" category="com.crowley.sfssinbound.dcsflag" message="#[%dw 2.0&#10;output application/json&#10;---&#10;vars.sfUpdateResponse]" />
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="DW SET DCS Response Payload"
+			doc:id="d38ae7d1-aa84-41aa-a816-e209ebeb64b4">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/dcs-flag/p-dcs-response.dwl" />
+			</ee:message>
+		</ee:transform>
+		<remove-variable
+			doc:name="Remove Variable originalRequest"
+			doc:id="923f75f9-bce1-4fe2-b98b-bc5bb254f765"
+			variableName="originalRequest" />
+		<logger level="INFO" doc:name="LOG INFO Flow End"
+			doc:id="47f64f8c-6202-4255-9b0b-44c27caf218c"
+			message='#[flow.name ++ " End"]' />
+		<error-handler ref="dcs-sync-common-error-handler" />
+	</flow>
+</mule>

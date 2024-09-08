@@ -1,0 +1,56 @@
+#%RAML 1.0 DataType
+type: object
+properties:
+  subject:
+    description: Subject that needs to be sent to C-Sight for case creation
+    type: string
+  errorMessage:
+    description: Description that needs to be sent C-Sight for case creation
+    type: string
+  emailTemplateConfigStoreKey:
+    description: This values help in retrieving the notification template from database 
+    type: string
+  errorDescription:
+    description: Error Description that needs to be used incase of any failures at time of case creation
+    type: string
+    required: false
+  caseDetailsRequired:
+    description: This value decides whether case details must be fetched or not
+    type: boolean
+    required: false
+  bookingNumber:
+    description: Booking Number 
+    type: string
+    required: false
+  bolNumber:
+    description: BOL Number 
+    type: string
+    required: false
+  contract:
+    description: Contract Number 
+    type: string
+    required: false
+  origin:
+    description : Origin value related to Specific interface
+    type: string
+    required: false
+  ownerId:
+    description : OwnerId value related to Specific interface
+    type: string
+    required: false
+  recordTypeId:
+    description : RecordTypeId value related to Specific interface
+    type: string
+    required: false
+  pricingType:
+    description : PricingType value related to Specific interface
+    type: string
+    required: false
+  issueType:
+    description : IssueType value related to Specific interface
+    type: string
+    required: false
+  resolutionCategory:
+    description : ResolutionCategory value related to Specific interface
+    type: string
+    required: false

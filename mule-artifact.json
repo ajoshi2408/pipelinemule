@@ -1,0 +1,19 @@
+{
+  "minMuleVersion": "4.4.0",
+  "secureProperties": 
+  [
+  "mule.key",
+  "anypoint.platform.client_secret",
+  "anypoint.platform.client_id",
+  "secure::https.clientId",
+  "secure::https.clientSecret",
+  "secure::https.certificate.key.pwd",
+  "secure::https.certificate.store.pwd",
+  "secure::salesforce.password",
+  "secure::salesforce.consumerKey",
+  "secure::salesforce.consumerSecret",
+  "secure::salesforce.securityToken",
+  "secure::sqlObjectStore.password",
+  "secure::kafka.consumer.password"
+  ]
+}

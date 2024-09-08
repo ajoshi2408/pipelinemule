@@ -1,0 +1,20 @@
+[
+{
+    "ModelNum": "441",
+    "ModelName": "Touareg",
+    "HeightCM": 175.26,
+    "Propulsion": null,
+    "Createdate": "2018-06-15T13:22:49.48",
+    "Changedate": null,
+    "CarModelID": 432,
+    "Type": "A",
+    "Manufacturer": "VW",
+    "Hide": "N",
+    "ModelCode": "Touareg",
+    "WidthCM": 195.58,
+    "LengthCM": 480.06,
+    "HandlingInd": "S",
+    "ModelYear": null,
+    "WeightKG": 2256.0
+  }
+  ]

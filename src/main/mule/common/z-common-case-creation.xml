@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="mf-case-creation" doc:id="91741e79-b5fc-4cfb-8ad3-0de6ac5e8197" doc:description="Common flow to create Case in Salesforce">
+		<ee:transform doc:name="DW SET FV metaData" doc:id="ef9feb18-0c9a-4c64-8967-8be76fbf9c9d">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable resource="dwl/c-case-creation-metadata.dwl" variableName="metaData" />
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG Request details for case creation" doc:id="4241e0ec-eeed-4456-a78b-2a68a0ff45f5" message="[case-creation] : Request Details received for case creation  #[vars.metaData]" category="com.crowley.sf.inbound.case.creation"/>
+		<choice doc:name="CHECK IF Case Details Call required" doc:id="5509d329-3720-43b5-8bd1-86e3c5226656">
+					<when expression="#[payload.caseDetailsRequired]">
+						<flow-ref doc:name="Refer to cf-get-salesforce-token" doc:id="49c75934-33bb-44c7-8166-28348bd00d4d" name="cf-get-salesforce-token" target="AccessToken" />
+						<ee:transform doc:name="DW SET CaseDetail Payload" doc:id="5f74959b-4af2-4c34-bf67-e4a6f59d429d">
+					<ee:message>
+								<ee:set-payload resource="dwl/c-case-details-request.dwl" />
+					</ee:message>
+				</ee:transform>
+						<flow-ref doc:name="Refer to sf-post-case-details" doc:id="feefc6e1-d3ff-4db6-a950-a54d33ed1974" name="sf-post-case-details" />
+						<ee:transform doc:name="DW SET Payload with Case Detail Response" doc:id="a33895da-d74e-4fcf-8618-c66af71ff758">
+					<ee:message>
+						<ee:set-payload resource="dwl/c-case-details-response.dwl" />
+					</ee:message>
+				</ee:transform>
+					</when>
+					<otherwise>
+						<logger level="INFO" doc:name="LOG INFO Case Details not required" doc:id="7cf3ed9e-9e7f-4336-ae8b-758e5cdc2e78" message="[case-creation] : Case Details not required" />
+						<ee:transform doc:name="DW SET Payload" doc:id="a3dec1c3-6c99-49f1-877f-5da3b41299b6">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+   "isError": false
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</otherwise>
+				</choice>
+		<choice doc:name="CHECK IF  IsError is False" doc:id="956297a4-c60e-440f-a406-a96b1a88a3f2">
+					<when expression="#[payload.isError == false]">
+						<ee:transform doc:name="DW SET Payload with case Request" doc:id="d23e59ba-d785-40bc-94e6-99c5c49e307b">
+							<ee:message>
+								<ee:set-payload resource="dwl/c-case-create-request.dwl" />
+							</ee:message>
+						</ee:transform>
+						<logger level="DEBUG" doc:name="LOG DEBUG Case Creation Request" doc:id="9c6ec747-761c-48b6-87c9-6da3f4cd358d" message="[case-creation] : Case Creation Request #[payload]" category="com.crowley.sf.inbound.case.creation" />
+						<flow-ref doc:name="Refer to sf-case-create-in-salesforce" doc:id="fecca13f-e0b6-41ac-864a-bafc1641552e" name="sf-case-create-in-salesforce" />
+						<logger level="DEBUG" doc:name="LOG DEBUG Case Creation Response" doc:id="c64f3e03-b696-48f5-9a7d-b1a7bdf8844d" message=" [case-creation] : Case Creation Response from SF ---- :: #[output application/json --- payload]" category="com.crowley.sf.inbound.case.creation" />
+						<validation:is-true doc:name="VALIDATION Salesforce Response Is true" doc:id="8adee145-82d4-4623-ba0b-a2ca4ef2a79d" expression="#[payload.successful]" message="Unable to create Case in SF" />
+				<ee:transform doc:name="DW SET PL Success Payload" doc:id="8ffef4eb-3455-4569-973e-9ce10e99e4ea" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  	Message: "Success",
+	caseResponse: payload  
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+					</when>
+					<otherwise>
+						<logger level="INFO" doc:name="LOG INFO Case detail error message" doc:id="ca262313-35e9-4a0a-a0de-4dee2586b868" message="[case-creation] : Error Occured in case creation in  SFSS - #[payload.message]" />
+				<ee:transform doc:name="DW SET PL Message" doc:id="01046c85-6582-4553-a62e-9d73ae2f1f74" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.message]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+					</otherwise>
+				</choice>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="39b14aea-7731-4fd4-9e48-069bfe959add" type="HTTP:CONNECTIVITY, SALESFORCE:CONNECTIVITY">
+				<ee:transform doc:name="DW SET Error Message Request for Support Ticket" doc:id="06ddb331-bb5a-46d5-9871-565f86c3e888" >
+					<ee:message >
+						<ee:set-payload resource="dwl/c-case-support-ticket-request.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="9c1d5e81-0ea6-4ee5-a64d-ec6c860ed2ca" message="[case-creation] : Error Occured in Case Creation Process #[error.detailedDescription]" />
+				<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="51fb1b3b-c481-4e3a-80f5-852b58f73f0c" name="cf-invoke-support-ticket-service" />
+			</on-error-continue>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="c5c992cf-2216-4a23-85a6-50b3f9122abb" type="ANY">
+				<ee:transform doc:name="DW SET Error Message Request for Notification" doc:id="5bb6b6b5-a92e-466b-9d54-3800aef9ab4c" >
+					<ee:message >
+						<ee:set-payload resource="dwl/c-case-notification.dwl" />
+					</ee:message>
+				</ee:transform>
+				<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="3d244073-7351-4960-b5ae-29170c49d97c" message="[case-creation] : Error Occured in Case Creation Process #[error.detailedDescription]" />
+				<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="af7de3de-c4db-4d08-a3da-374a9aad6eb5" name="cf-invoke-notification-service" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<sub-flow name="sf-post-case-details" doc:id="6113d277-269f-4c36-968d-ae0381a0f6d1" >
+		<logger level="INFO" doc:name="LOG INFO [Start] Invoke SF Endpoint for CaseDetails " doc:id="a8150297-14af-47cf-9b16-27b005a3168f" message="[case-creation] : LOG INFO [Start] Invoke SF Endpoint for CaseDetails "/>
+		<http:request method="POST" doc:name="POST - Invoke HTTP CaseDetails" doc:id="89ab2f73-de13-4546-bf9d-8b9c8fc607ff" config-ref="common_sf_case_http-request-config" path="${salesforce.case.path}">
+					<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.AccessToken,
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+				</http:request>
+		<logger level="INFO" doc:name="LOG INFO [End] Invoke SF Endpoint for CaseDetails " doc:id="43196272-b4eb-4fe1-b424-2b0daa27b10b" message="[case-creation] : LOG INFO [End] Invoke SF Endpoint for CaseDetails " />
+	</sub-flow>
+	<sub-flow name="sf-case-create-in-salesforce" doc:id="b62b3764-a43b-4df7-8e32-cf9f45b73b56" >
+		<logger level="INFO" doc:name="LOG INFO [Start] Case Creation" doc:id="ca38efc0-3e35-41cd-bfe1-bd66190f9da2" message="[case-creation] : LOG INFO [Start] Case Creation"/>
+		<salesforce:create type="Case" doc:name="Salesforce - Create Case" doc:id="de7d83af-0b6d-479c-9d65-8efcda3f2322" config-ref="common_salesforce-configuration" />
+		<logger level="INFO" doc:name="LOG INFO [End] Case Creation" doc:id="6a1a8024-eedd-41aa-884e-c3bf951b5c98" message="[case-creation] : LOG INFO [End] Case Creation"/>
+	</sub-flow>
+</mule>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="credit-info-common-error-handler" doc:id="ea65bafd-2bbf-4d48-a62a-be8b9d9d5220" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue - For All Connectivity Errors" doc:id="50d42756-b510-4b38-858d-0804a389aeb7" type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, DB:CONNECTIVITY, DB:RETRY_EXHAUSTED">
+			<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="72521ae6-2324-4257-8d99-ef1ef36f6667" message='[Credit-Info] Error sending Account Credit request to SF due to #[error.detailedDescription] for DocId #[vars.docId]' />
+			<ee:transform doc:name="DW SET Error Message for Support Ticket" doc:id="71b42bd1-f258-474c-be9a-7cf182d6aa92" >
+				<ee:message >
+					<ee:set-payload resource="dwl/credit-info/p-support-ticket-credit-request.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="ae0a64ac-4165-4cd6-b7fa-fe545889b8ab" name="cf-invoke-support-ticket-service" target="supportTicketPayload"/>
+			<ee:transform doc:name="DW SET Error Message" doc:id="55e77127-c97e-4818-a819-5498b5648f34" >
+				<ee:message >
+					<ee:set-payload resource="dwl/credit-info/p-notification-credit-error.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="f68174dc-798a-48b2-94ae-a2e6375512b8" name="cf-invoke-notification-service" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="851186f8-5564-4440-8266-8298fe5f9736" type="ANY">
+			<logger level="ERROR" doc:name="LOG ERROR Message" doc:id="59c1be91-aef5-42af-80e9-245e9dec9df3" message='[Credit-Info] Error sending Account Credit request to SF due to #[error.detailedDescription] for DocId #[vars.docId]' />
+			<ee:transform doc:name="DW SET Error Message" doc:id="621d6717-bcac-48fe-84e6-65f6eafa881a" >
+				<ee:message >
+					<ee:set-payload resource="dwl/credit-info/p-notification-credit-error.dwl" />
+				</ee:message>
+			</ee:transform>
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="d988694b-4333-4dc4-9954-a1dcc81e825d" name="cf-invoke-notification-service" />
+		</on-error-continue>
+	</error-handler>
+</mule>

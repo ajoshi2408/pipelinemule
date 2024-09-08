@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="voyageInfo-common-error-handler" doc:id="d9ff1911-9652-49cd-9c46-2129880502b3" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue - Connectivity Errors" doc:id="88db1d32-f823-42ea-885d-b438db159871" type="SALESFORCE:CONNECTIVITY, SALESFORCE:TIMEOUT, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED">
+			<ee:transform doc:name="DW SET Payload Support Ticket" doc:id="8e143bb1-e833-4cde-b109-ff635fe38a5a" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-voyageInfo/p-support-ticket-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors" doc:id="5fc82e49-688a-472d-8118-6fa95d593d80" message="[voyageInfo] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-support-ticket-service" doc:id="cf01d0d4-85d7-4979-912d-fe2900631324" name="cf-invoke-support-ticket-service"/>
+			<ee:transform doc:name="DW SET Payload Notification" doc:id="fb90d720-566f-4fc0-8807-90c21cfda186" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-voyageInfo/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Connectivity Errors" doc:id="206ce857-9db6-488f-96d2-1f99b429f17a" message="[voyageInfo] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="91a77083-540f-4ca6-9ae8-c867a8d0ccb3" name="cf-invoke-notification-service"/>
+		</on-error-continue>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue " doc:id="265b31f1-a4e5-4435-81ae-8048a329c508" type="ANY" >
+			<ee:transform doc:name="DW SET Payload Notification" doc:id="81f96964-0d91-4a0d-87cb-c21432c003d0" >
+				<ee:message >
+					<ee:set-payload resource="dwl/get-voyageInfo/p-notification-details.dwl" />
+				</ee:message>
+			</ee:transform>
+			<logger level="ERROR" doc:name="LOG ERROR Other Errors" doc:id="fdc2f388-5b7f-4ada-8bd9-b31f29e338ad" message="[voyageInfo] : #[payload]" />
+			<flow-ref doc:name="Refer to cf-invoke-notification-service" doc:id="94a8a166-2f54-46ad-a754-4172614d72e5" name="cf-invoke-notification-service" />
+		</on-error-continue>
+	</error-handler>
+</mule>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="z-common-apex-salesforce" doc:id="b347e35e-3b51-415a-9ed5-761faedacf6c" >
+		<http:listener doc:name="Listener" doc:id="11a6f361-5093-49a1-b0ab-296a41ebce38" config-ref="HTTP_Listener_config" path="/apex"/>
+		<logger level="INFO" doc:name="LOG INFO Apex Start" doc:id="7d30fd81-0734-4908-9e34-e018d10e931c" message="Common apex-rest flow started"/>
+		<ee:transform doc:name="DW PAYLOAD Set Apex Payload" doc:id="6bf5f047-1cb2-40ca-844a-6ad2c5b9aef0">
+			<ee:message>
+				<ee:set-payload resource="dwl/c-apex-method-request.dwl" />		
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="className" resource="dwl/c-apex-method-className.dwl" />	
+				<ee:set-variable variableName="methodName" resource="dwl/c-apex-method-methodName.dwl" />	
+			</ee:variables>
+		</ee:transform>
+		<salesforce:invoke-apex-rest-method doc:name="Invoke apex rest method" doc:id="677c467b-65fd-4ebb-84e9-7f4017ce902a" config-ref="common_salesforce-configuration" className="#[vars.className]" methodName="#[vars.methodName]"/>
+		<ee:transform doc:name="DW PAYLOAD Json Payload" doc:id="16bbdfea-300a-49c0-b0f1-5a4555058fab" >
+			<ee:message >
+				<ee:set-payload resource="dwl/c-apex-method-response.dwl" />		
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="LOG INFO Apex End" doc:id="b57ed289-141d-4969-a859-395a6e1bf5cc" message="Common apex-rest flow end"/>
+	</flow>
+</mule>

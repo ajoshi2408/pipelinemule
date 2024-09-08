@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	<flow name="mf-upsert-truck-carriers-file"
+		doc:id="264e79c6-005a-41b3-ae75-53ceb5232f8f"
+		initialState="${truck.sftp.initialState}" maxConcurrency="${truck.sftp.maxconcurrency}">
+		<sftp:listener
+			doc:name="Poll Input Directory /UIIA/RPA Ingested to Fetch File"
+			doc:id="2db7e710-f0a6-49dd-b4b3-55f18679f0bc"
+			config-ref="truck_carriers_sftp-configuration"
+			directory="${truck.sftp.directory.input}" autoDelete="true"
+			recursive="false" applyPostActionWhenFailed="false">
+			<reconnect-forever
+				frequency="${truck.sftp.reconnection.frequency}" />
+			<scheduling-strategy>
+				<fixed-frequency
+					frequency="${truck.sftp.scheduler.frequency}" timeUnit="MINUTES" />
+			</scheduling-strategy>
+			<sftp:matcher
+				filenamePattern="${truck.sftp.matcher.filePattern}"
+				directories="EXCLUDE" />
+		</sftp:listener>
+		<set-variable
+			value="#[attributes.fileName as String ++ '.' ++ (now() as String {format: &quot;yyyy_MM_dd_HH_mm_ss_SSS&quot;}) default &quot;&quot; ++ &quot;.xml&quot;]"
+			doc:name="FV SET fileName"
+			doc:id="6c77375a-cc07-4ce0-9fab-334566edfc83" variableName="fileName" />
+		<logger level="INFO"
+			doc:name="LOG INFO Truck Carrier SFTP Flow Started"
+			doc:id="738cfb70-eaaa-4d36-b138-886ed8be8e38"
+			message="VM Publisher Main Flow - SFTP Truck Carrier Flow Started for file: #[vars.fileName]" />
+		<vm:publish
+			doc:name="VM Publish Truck Carrier's File Data into Queue"
+			doc:id="20d1337e-30c1-4cde-bd37-b391219fdd08"
+			config-ref="truck_carriers_vm-configuration"
+			queueName="${truck.vm.queue}" sendCorrelationId="ALWAYS"
+			timeout="${truck.vm.timeout}"
+			correlationId='#[correlationId ++ " " ++ vars.fileName]' />
+		<error-handler>
+			<on-error-propagate enableNotifications="true"
+				logException="true" doc:name="On Error Propagate"
+				doc:id="f9fa7b91-5a93-422b-ab3a-b6771328a508" type="ANY">
+				<logger level="ERROR"
+					doc:name="LOG ERROR Inside VM Publish Main Flow"
+					doc:id="10c9a836-03e1-4df8-b864-73c643225585"
+					message="VM Publisher Main Flow - Error Occured for File: #[vars.fileName]" />
+				<ee:transform
+					doc:name="DW SET Variable writeInput &amp; message"
+					doc:id="a18decf5-941e-4895-8907-68b51cefed82">
+					<ee:variables>
+						<ee:set-variable variableName="writeInput"><![CDATA[%dw 2.0
+output application/xml
+---
+payload]]></ee:set-variable>
+						<ee:set-variable variableName="message"><![CDATA[%dw 2.0
+output application/json
+---
+"Error Occurred in VM Publish Flow"]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<flow-ref
+					doc:name="Refer to sf-error-truck-carriers-any-mule-notification"
+					doc:id="2ea96708-6ab8-4668-99d3-ff6f56e18952"
+					name="sf-error-truck-carriers-any-mule-notification" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="pf-upsert-truck-carriers-data-into-salesforce"
+		doc:id="f3f8b3b5-7545-445a-a3ee-cd6503727819">
+		<vm:listener
+			doc:name="VM Subscribe Truck Carrier's File Data From Queue"
+			doc:id="5f190410-ce7d-4daa-94b2-f9dbb7c00a99"
+			config-ref="truck_carriers_vm-configuration"
+			numberOfConsumers="${truck.vm.consumer}"
+			queueName="${truck.vm.queue}" timeout="${truck.vm.timeout}" />
+		<logger level="INFO"
+			doc:name="LOG INFO Truck Carrier VM Listener Flow Started"
+			doc:id="dafa89ed-2c94-446f-9d0b-90ba849b5017"
+			message='VM Listener Main Flow - Truck Carrier Upsert Started for file: #[(correlationId splitBy " ")[1]]' />
+		<ee:transform
+			doc:name="DW Declare Initial Variable for Truck Carriers"
+			doc:id="ba442e1c-e82c-41ac-b313-8dd47691c8b0">
+			<ee:variables>
+				<ee:set-variable variableName="fileName"><![CDATA[%dw 2.0
+output application/json
+---
+(correlationId splitBy " ")[1]]]></ee:set-variable>
+				<ee:set-variable variableName="correlationId"><![CDATA[%dw 2.0
+output application/json
+---
+(correlationId splitBy " ")[0]]]></ee:set-variable>
+				<ee:set-variable variableName="writeInput"><![CDATA[%dw 2.0
+output application/xml
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform
+			doc:name="DW Filter Valid &amp; Invalid Truck Carrier's Data"
+			doc:id="877fc2e0-b6e9-46a2-abcd-7a59b6eccd11">
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/truck-carriers/v-truck-carriers-file-input-data.dwl"
+					variableName="fileInput" />
+			</ee:variables>
+		</ee:transform>
+		<ee:transform
+			doc:name="DW Map Correct Truck Carrier's Data into SF Composite Input"
+			doc:id="a74a0fb6-1add-4243-bac5-52c1477c97b9">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/truck-carriers/p-truck-carriers-salesforce-composite-input.dwl" />
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="LOG DEBUG SalesForce Composite Request" doc:id="2286a6cc-9a77-4c61-a47b-f50ead27318a" message="Truck Carrier's SalesForce Composite Request for file: #[vars.fileName] , #[payload] " category="com.crowley.salesforceinboundss.truck.carriers"/>
+		<foreach doc:name="For Each truck-sf-composite-request"
+			doc:id="edfd3965-4a0c-4aad-b197-b16e3438766c"
+			batchSize="${truck.sfcomposite.batchSize}">
+			<flow-ref
+				doc:name="Refer to sf-upsert-truck-carriers-salesforce-composite"
+				doc:id="7df55e76-65e6-4ad5-a96f-cbc828c9f0e0"
+				name="sf-upsert-truck-carriers-salesforce-composite" />
+		</foreach>
+		<flow-ref
+			doc:name="Refer to sf-upsert-truck-carriers-salesforce-composite-response-filter"
+			doc:id="f02b0aaa-cfbc-415f-94e9-eeb4744f5a2a"
+			name="sf-upsert-truck-carriers-salesforce-composite-response-filter" />
+		<logger level="INFO"
+			doc:name="LOG INFO Truck Carrier VM Listener Flow Completed"
+			doc:id="8803ae63-f0cc-4b22-b057-52bc0b1887d2"
+			message="VM Listener Main Flow - Truck Carrier's Data Completed for file: #[vars.fileName]" />
+		<error-handler
+			ref="error-handling-truck-carriers-vm-listener-flow" />
+	</flow>
+	<flow name="sf-upsert-truck-carriers-salesforce-composite"
+		doc:id="9352ca46-896e-43f4-93e4-163566e1988e">
+		<ee:transform
+			doc:name="DW Map SF Composite Payload as Request"
+			doc:id="28af6829-e90b-4ce1-a2da-e38ad71ab5d1">
+			<ee:message>
+				<ee:set-payload
+					resource="dwl/truck-carriers/p-truck-carriers-sf-composite-payload.dwl" />
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Refer to cf-common-salesforce-composite"
+			doc:id="4aacae9e-ab12-4f38-b8d9-8ae8131f47a7"
+			name="cf-common-salesforce-composite" />
+		<set-variable
+			value="#[%dw 2.0&#10;output application/json&#10;---&#10;((vars.truckSFResponse default[]) ++ (payload.compositeResponse default []))]"
+			doc:name="FV SET truckSFResponse Concat"
+			doc:id="a77b3762-3fd7-476b-a323-d1e69b105b98"
+			variableName="truckSFResponse" />
+		<logger level="DEBUG"
+			doc:name="LOG DEBUG Truck Carrier sfResponse"
+			doc:id="783ce6dc-0c8b-4790-b77d-b6d1b197d64d"
+			message="SFTP Truck Carriers Response For File: #[vars.fileName], sfResponse: #[vars.truckSFResponse]"
+			category="com.crowley.salesforceinboundss.truck.carriers" />
+		<error-handler>
+			<on-error-continue enableNotifications="true"
+				logException="true" doc:name="On Error Continue"
+				doc:id="c082cb4c-e85e-4cb4-9860-d468b3319665"
+				when='#[error.errorType.asString != "SALESFORCE-COMPOSITE:CONNECTIVITY"]'>
+				<ee:transform doc:name="DW SET Variable loopError"
+					doc:id="8081f525-3ec8-436e-be1a-b381750247b1">
+					<ee:variables>
+						<ee:set-variable
+							resource="dwl/truck-carriers/v-truck-carriers-for-each-loop-error.dwl"
+							variableName="loopError" />
+					</ee:variables>
+				</ee:transform>
+				<logger level="ERROR" doc:name="LOG ERROR loopError Details"
+					doc:id="78b93d07-94cf-4db4-9776-423ed110e2f5"
+					message="Loop Error Details Inside For Each Flow For File: #[vars.fileName] , loopError:  #[vars.loopError]" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<sub-flow
+		name="sf-upsert-truck-carriers-salesforce-composite-response-filter"
+		doc:id="fadb612d-df1f-4688-85ba-a73a9452bf4d">
+		<ee:transform doc:name="DW Filter SF Error Response"
+			doc:id="a9f21bd0-b9b0-483e-8465-2f8ae2eafbf3">
+			<ee:variables>
+				<ee:set-variable
+					resource="dwl/truck-carriers/v-truck-carriers-sf-error-response.dwl"
+					variableName="sfErrorResponse" />
+			</ee:variables>
+		</ee:transform>
+		<remove-variable doc:name="FV REMOVE truckSFResponse"
+			doc:id="27b49c7a-91e9-4471-acab-9440525bb90f"
+			variableName="truckSFResponse" />
+		<choice
+			doc:name="CHECK IF No Incorrect Data &amp; No Error Found"
+			doc:id="a5ae131d-7b94-42af-8d50-c8d47beb1f83">
+			<when
+				expression="#[((!isEmpty(vars.loopError)) or ((!isEmpty(vars.fileInput.incorrectTruckData)) or (!isEmpty(vars.sfErrorResponse))))]">
+				<logger level="INFO" doc:name="LOG INFO Data Error Occured"
+					doc:id="16c26f55-7eb5-477e-b137-7122176df167"
+					message="Data Error Occured Inside For File: #[vars.fileName]" />
+				<flow-ref
+					doc:name="Refer to sf-error-truck-carriers-data-issue"
+					doc:id="39020a1a-d6f3-4152-84ea-0261cb87578d"
+					name="sf-error-truck-carriers-data-issue" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="LOG INFO No Error Occurred"
+					doc:id="9e0686ba-d6b2-4270-b580-e0577388ee93"
+					message="Default Path Executed For File: #[vars.fileName]" />
+				<set-variable
+					value="${truck.sftp.directory.input}${truck.sftp.directory.archive}"
+					doc:name='FV SET writePath "RPA Ingested/Archive" Directory'
+					doc:id="8e91e15f-f190-4e1a-8aee-9c0cf71b76f8"
+					variableName="writePath" />
+			</otherwise>
+		</choice>
+		<flow-ref
+			doc:name="Refer to sf-write-truck-carriers-data-in-sftp-directory"
+			doc:id="aaba3f37-6071-448d-84d7-15db566e84f8"
+			name="sf-write-truck-carriers-data-in-sftp-directory" />
+	</sub-flow>
+	<flow name="sf-write-truck-carriers-data-in-sftp-directory"
+		doc:id="08b908bd-b3d2-4363-9403-b2c0acfd97f0">
+		<logger level="INFO"
+			doc:name="LOG INFO SFTP Write Truck Carrier Flow Started"
+			doc:id="c2f24b1c-06bb-4239-8afb-f46ce0f5fd84"
+			message="SFTP Write Truck Carrier Flow Started for file #[vars.fileName]" />
+		<sftp:write
+			doc:name='WRITE File into "RPA Ingested/Archive" or RPA Ingested/Error" Directories'
+			doc:id="c61736cb-8c0e-4c6b-9c23-95d04da6e6c9"
+			config-ref="truck_carriers_sftp-configuration"
+			createParentDirectories="false" mode="CREATE_NEW"
+			path="#[vars.writePath ++ vars.fileName]">
+			<reconnect frequency="${truck.sftp.reconnection.frequency}"
+				count="${truck.sftp.reconnection.retry}" />
+			<sftp:content><![CDATA[#[vars.writeInput]]]></sftp:content>
+		</sftp:write>
+		<logger level="INFO"
+			doc:name="LOG INFO SFTP Write Truck Carrier Flow Completed"
+			doc:id="919eac41-c65b-46db-94de-764df552860b"
+			message="SFTP Write Truck Carrier Flow Completed for file: #[vars.fileName]" />
+		<error-handler>
+			<on-error-continue enableNotifications="true"
+				logException="true" doc:name="On Error Continue"
+				doc:id="028d8bf5-cf35-4cab-9733-3eb7f4786252">
+				<logger level="ERROR"
+					doc:name="LOG ERROR Inside SFTP Write File Flow"
+					doc:id="95466076-bfdd-4396-b87b-f5cd637f6566"
+					message="Error Occurred Inside SFTP Write File Flow - #[error.errorType.asString] : For File: #[vars.fileName]" />
+				<flow-ref
+					doc:name="Refer to sf-error-truck-carrier-sftp-write"
+					doc:id="39c184f2-9d6d-4bc7-9e74-b96c2715bd7b"
+					name="sf-error-truck-carrier-sftp-write" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>

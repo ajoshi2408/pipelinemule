@@ -1,0 +1,28 @@
+{
+    "compositeResponse": [
+        {
+            "body": {
+                "id": "a2k8D000000LTsgQAG",
+                "success": true,
+                "errors": []
+            },
+            "httpHeaders": {
+                "Location": "/services/data/v51.0/sobjects/Bill_Of_Lading__c/a2k8D000000LTsgQAG"
+            },
+            "httpStatusCode": 201,
+            "referenceId": "bolId"
+        },
+        {
+            "body": {
+                "id": "a2j8D000000Mdl5QAC",
+                "success": true,
+                "errors": []
+            },
+            "httpHeaders": {
+                "Location": "/services/data/v51.0/sobjects/Bill_Item__c/a2j8D000000Mdl5QAC"
+            },
+            "httpStatusCode": 201,
+            "referenceId": "Bill_Item__c0"
+        }
+    ]
+}

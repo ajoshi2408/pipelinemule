@@ -1,0 +1,163 @@
+{
+    "number": "BRN-478433",
+    "headers": {
+        "label": "CICStoSSH",
+        "senderID": "",
+        "receiverID": "",
+        "shipmentIdNumber": "0778915-CusCont04d0822113236",
+        "readyDate": "2022-07-01T00:00:00.0000000Z",
+        "paymentTerms": "PP",
+        "status": "A",
+        "source": "E",
+        "sourceDescription": "Customer Booking API",
+        "cargo807Ind": "N",
+        "hazLockDate": "",
+        "hazLockTime": "",
+        "bookDate": "20230830",
+        "inbondInd": "N",
+        "inbondType": "",
+        "bookTypeCode": "NB",
+        "licenseReqInd": "N",
+        "usFlagInd": "N",
+        "bolReleaseLoc": "",
+        "noSplitInd": "N",
+        "noAdvanceInd": "N",
+        "loadLastInd": "N",
+        "insureReqInd": "N",
+        "origCmcPickupDelvr": "",
+        "destCmcPickupDelvr": "",
+        "cmcPickupLoc": "",
+        "cmcDeliverLoc": "",
+        "originAltPort": "",
+        "destAltPort": "",
+        "bkgBolNum": "",
+        "bkgReqActionCode": "",
+        "bkgReqSCAC": "CPRC"
+    },
+    "optionalServices": [],
+    "serviceType": {
+        "originType": "P",
+        "destinationType": "P",
+        "description": "PP"
+    },
+    "imType": {
+        "imOrigin": "",
+        "imDestination": ""
+    },
+    "tmsType": {
+        "tmsOrigin": "",
+        "tmsDestination": ""
+    },
+    "customerOrigin": {
+        "transId": "",
+        "stopId": "",
+        "code": "",
+        "city": "",
+        "state": "",
+        "country": "",
+        "zip": "",
+        "referenceNumber": ""
+    },
+    "customerDestination": {
+        "transId": "",
+        "stopId": "",
+        "code": "",
+        "city": "",
+        "state": "",
+        "country": "",
+        "zip": "",
+        "referenceNumber": ""
+    },
+    "connectingCarrier": {
+        "connectWith": "",
+        "connectAtLoc": {
+            "city": "",
+            "state": "",
+            "country": ""
+        },
+        "connectToLoc": {
+            "city": "",
+            "state": "",
+            "country": ""
+        }
+    },
+    "parties": [],
+    "transports": [],
+    "bookingRemarks": [],
+    "bookingReferenceNums": [],
+    "ediReferenceNums": [
+        {
+            "ediReferenceNum": {
+                "qualifier": "BN",
+                "referenceNumber": "CAT202308300735123123123123123131231"
+            }
+        },
+        {
+            "ediReferenceNum": {
+                "qualifier": "IL",
+                "referenceNumber": "BRN-478433"
+            }
+        },
+        {
+            "ediReferenceNum": {
+                "qualifier": "SHP",
+                "referenceNumber": "SHP1234"
+            }
+        },
+        {
+            "ediReferenceNum": {
+                "qualifier": "CON",
+                "referenceNumber": "CEE1234"
+            }
+        }
+    ],
+    "shipments": [
+        {
+            "number": "001",
+            "origin": {
+                "port": "",
+                "location": {
+                    "locCode": "",
+                    "city": "",
+                    "state": "",
+                    "country": ""
+                }
+            },
+            "destination": {
+                "port": "",
+                "location": {
+                    "locCode": "",
+                    "city": "",
+                    "state": "",
+                    "country": ""
+                }
+            },
+            "exemptCode": "",
+            "itn": "",
+            "itnSource": "",
+            "isSedIndicator": "false",
+            "status": "N",
+            "custNotifications": {
+                "custNotification": {
+                    "id": "",
+                    "equipID": "",
+                    "carrierCode": "",
+                    "equipLength": "",
+                    "equipCategory": "",
+                    "equipFleet": "",
+                    "railCarID": "",
+                    "equipExitLoc": "",
+                    "equipExitDate": "",
+                    "equipExitTime": "",
+                    "equipExitTimeZone": ""
+                }
+            },
+            "voyages": [],
+            "freightDetails": [],
+            "dockReceipts": []
+        }
+    ],
+    "isPartialResult": false,
+    "billOfLadingNumbers": [],
+    "bookingChargeLines": []
+}
