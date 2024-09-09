@@ -37,7 +37,7 @@ http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mu
 http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
 	<configuration-properties doc:name="Configuration properties" doc:id="cc6c432c-f83f-47f7-a105-1536023909cb" file="properties\config-${env}.yaml" doc:description="Configuration Properties"/>
 	<configuration-properties doc:name="sfdc_properties-configuration" doc:id="743e1b8e-b30d-4e03-ab21-30dc028434a2" file="properties\sfdc-config.yaml" doc:description="Configuration Properties"/>
-	<global-property doc:name="Global Property" doc:id="4ae0aa08-4428-4eea-98a5-916831293d2b" name="env" value="qa" doc:description="Global Property to define in which environment"/>
+	<global-property doc:name="Global Property" doc:id="4ae0aa08-4428-4eea-98a5-916831293d2b" name="env" value="dev" doc:description="Global Property to define in which environment"/>
 	<secure-properties:config name="secure_properties-configuration" doc:name="Secure Properties Config" doc:id="fd90f74c-0e67-4234-b800-de0cb3e7c20e" file="properties\config-secure-${env}.yaml" key="${mule.key}" doc:description="Secure Configuration Properties">
 		<secure-properties:encrypt algorithm="Blowfish" />
 	</secure-properties:config>
